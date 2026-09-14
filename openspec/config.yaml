@@ -1,0 +1,44 @@
+schema: spec-driven
+
+context: |
+  Projeto: mem-words-backend — API do aplicativo que ajuda a memorizar palavras.
+  Stack: Node.js 22, TypeScript 7 (strict), Express 5, cors, dotenv.
+  Build: tsc para dist/ (module/moduleResolution nodenext, target ES2023).
+  Dev: tsx watch. Imports relativos usam a extensão .js (exigência do nodenext).
+  Estrutura: src/app.ts (app Express), src/server.ts (bootstrap HTTP),
+  src/routes, src/controllers, src/middlewares, src/config, src/types.
+  Scripts: npm run dev, npm run build, npm start, npm run typecheck.
+  Estado atual: apenas o health-check GET /health está implementado.
+  CORS está liberado para qualquer origem e será restringido quando a URL
+  do frontend for definida (variável CORS_ORIGIN).
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
