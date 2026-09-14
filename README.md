@@ -2,12 +2,14 @@
 
 Backend para aplicação que ajuda a memorizar palavras.
 
-API em Node.js com Express. No momento apenas o health-check está implementado.
+API em Node.js com TypeScript e Express. No momento apenas o health-check está implementado.
 
 ## Requisitos
 
 - Node.js 22+
 - npm 10+
+
+O TypeScript é uma dependência de desenvolvimento — não precisa ser instalado globalmente.
 
 ## Instalação
 
@@ -19,8 +21,10 @@ cp .env.example .env
 ## Execução
 
 ```bash
-npm run dev    # desenvolvimento, com reload automático (nodemon)
-npm start      # produção
+npm run dev        # desenvolvimento, com reload automático (tsx watch)
+npm run build      # compila TypeScript para dist/
+npm start          # produção (executa dist/, exige build antes)
+npm run typecheck  # checagem de tipos sem emitir arquivos
 ```
 
 O servidor sobe em `http://localhost:3000` por padrão (configurável via `PORT`).
@@ -58,18 +62,36 @@ CORS_ORIGIN=https://app.mem-words.com,http://localhost:5173
 
 ```
 src/
-├── app.js                  # instância do Express (middlewares + rotas)
-├── server.js               # bootstrap do servidor HTTP
+├── app.ts                  # instância do Express (middlewares + rotas)
+├── server.ts               # bootstrap do servidor HTTP
 ├── config/
-│   ├── cors.js             # opções de CORS
-│   └── env.js              # leitura das variáveis de ambiente
+│   ├── cors.ts             # opções de CORS
+│   └── env.ts              # leitura e validação das variáveis de ambiente
 ├── controllers/
-│   └── health.controller.js
+│   └── health.controller.ts
 ├── middlewares/
-│   └── errorHandler.js     # 404 e tratamento centralizado de erros
-└── routes/
-    ├── health.routes.js
-    └── index.js
+│   └── errorHandler.ts     # 404 e tratamento centralizado de erros
+├── routes/
+│   ├── health.routes.ts
+│   └── index.ts
+└── types/
+    └── health.ts           # tipos de resposta do health-check
+```
+
+O build gera `dist/` com JavaScript, *source maps* e arquivos de declaração
+(`.d.ts`).
+
+### TypeScript
+
+`tsconfig.json` usa `strict` com as checagens adicionais
+(`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+`noImplicitOverride`) e `module`/`moduleResolution` em `nodenext`.
+
+Por causa do `nodenext`, **imports relativos levam a extensão `.js`** mesmo
+apontando para arquivos `.ts` — é o caminho do arquivo já compilado:
+
+```ts
+import env from './config/env.js';
 ```
 
 ## OpenSpec

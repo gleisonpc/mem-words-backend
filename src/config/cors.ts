@@ -1,6 +1,6 @@
-'use strict';
+import type { CorsOptions } from 'cors';
 
-const env = require('./env');
+import env from './env.js';
 
 /**
  * Opções de CORS.
@@ -9,10 +9,10 @@ const env = require('./env');
  * definida, basta preencher CORS_ORIGIN (uma ou mais origens separadas por
  * vírgula) que a lista passa a ser aplicada, sem alterar o código.
  */
-function buildCorsOptions() {
+export function buildCorsOptions(): CorsOptions {
   const configured = env.corsOrigin.trim();
 
-  const origin =
+  const origin: CorsOptions['origin'] =
     configured === '' || configured === '*'
       ? '*'
       : configured
@@ -27,5 +27,3 @@ function buildCorsOptions() {
     credentials: false,
   };
 }
-
-module.exports = { buildCorsOptions };

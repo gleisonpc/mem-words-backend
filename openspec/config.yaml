@@ -2,10 +2,12 @@ schema: spec-driven
 
 context: |
   Projeto: mem-words-backend — API do aplicativo que ajuda a memorizar palavras.
-  Stack: Node.js 22, Express 5, CommonJS, cors, dotenv.
-  Estrutura: src/app.js (app Express), src/server.js (bootstrap HTTP),
-  src/routes, src/controllers, src/middlewares, src/config.
-  Scripts: npm run dev (nodemon), npm start.
+  Stack: Node.js 22, TypeScript 7 (strict), Express 5, cors, dotenv.
+  Build: tsc para dist/ (module/moduleResolution nodenext, target ES2023).
+  Dev: tsx watch. Imports relativos usam a extensão .js (exigência do nodenext).
+  Estrutura: src/app.ts (app Express), src/server.ts (bootstrap HTTP),
+  src/routes, src/controllers, src/middlewares, src/config, src/types.
+  Scripts: npm run dev, npm run build, npm start, npm run typecheck.
   Estado atual: apenas o health-check GET /health está implementado.
   CORS está liberado para qualquer origem e será restringido quando a URL
   do frontend for definida (variável CORS_ORIGIN).
