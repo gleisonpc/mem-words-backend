@@ -24,3 +24,8 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+/src/generated/prisma
+
+# Prisma client gerado (recriado por `prisma generate` no build)
+src/generated/
