@@ -249,6 +249,25 @@ O servidor escuta em `0.0.0.0` (e não apenas em `localhost`), senão o health
 check do Render não alcança a aplicação, e trata `SIGTERM` para encerrar as
 conexões em andamento a cada deploy.
 
+## Verificando um deploy
+
+`scripts/smoke.sh` exercita um ambiente publicado de ponta a ponta:
+
+```bash
+./scripts/smoke.sh https://seu-servico.onrender.com
+```
+
+Verifica, nesta ordem: o processo está no ar (`/health`), a aplicação conecta
+no banco (`/health/ready`), as tabelas existem (cadastro), e o fluxo de
+autenticação funciona — incluindo a rotação do refresh token e a recusa de um
+token já usado. Cria um usuário temporário e o remove ao final.
+
+Sai com código `1` na primeira falha, com o diagnóstico provável. Útil em CI
+ou como verificação pós-deploy.
+
+> No plano gratuito o serviço hiberna após inatividade: a primeira requisição
+> pode levar cerca de um minuto. O script já usa timeout generoso.
+
 ## OpenSpec
 
 O projeto usa [OpenSpec](https://github.com/Fission-AI/OpenSpec) para
