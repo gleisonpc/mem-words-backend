@@ -29,10 +29,27 @@ recusar iniciar sem ela.
 Alterações no esquema do banco MUST ser expressas como migrations
 versionadas no repositório, e MUST ser aplicadas automaticamente no deploy.
 
+A aplicação das migrations MUST poder usar uma connection string distinta da
+usada em runtime, porque provedores com pool de conexões expõem um endpoint
+agrupado inadequado para migrations, que exigem conexão direta.
+
+Quando a connection string dedicada não for informada, o sistema MUST usar a
+mesma da aplicação.
+
 #### Scenario: Deploy com migration pendente
 
 - **WHEN** um deploy carrega uma migration ainda não aplicada
 - **THEN** ela é aplicada antes de o serviço passar a atender requisições
+
+#### Scenario: Provedor com pool de conexões
+
+- **WHEN** a connection string dedicada a migrations está configurada
+- **THEN** as migrations usam essa conexão, e a aplicação segue usando a sua
+
+#### Scenario: Sem connection string dedicada
+
+- **WHEN** apenas a connection string da aplicação está configurada
+- **THEN** as migrations usam essa mesma conexão
 
 ### Requirement: Integridade referencial dos dados do usuário
 

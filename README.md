@@ -43,7 +43,8 @@ O servidor sobe em `http://localhost:3000` por padrão (configurável via `PORT`
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| `GET` | `/health` | Health-check → `{ "status": "ok" }` |
+| `GET` | `/health` | Sinal de vida → `{ "status": "ok" }` (não consulta o banco) |
+| `GET` | `/health/ready` | Prontidão → `200` se o banco responde, `503` se não |
 | `POST` | `/auth/register` | Cria um usuário → `201` |
 | `POST` | `/auth/login` | Autentica → access + refresh token |
 | `POST` | `/auth/refresh` | Troca o refresh token por um novo par |
@@ -134,7 +135,8 @@ um usuário remove suas sessões).
 
 | Variável | Obrigatória | Padrão | Descrição |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | **sim** | — | Connection string do PostgreSQL |
+| `DATABASE_URL` | **sim** | — | Connection string do PostgreSQL (use a *pooled*) |
+| `DIRECT_DATABASE_URL` | não | `DATABASE_URL` | Conexão **direta**, usada só pelas migrations |
 | `JWT_ACCESS_SECRET` | **sim** | — | Segredo do access token |
 | `JWT_REFRESH_SECRET` | **sim** | — | Segredo do refresh token (diferente do anterior) |
 | `PORT` | não | `3000` | Porta HTTP |
@@ -204,7 +206,7 @@ Se preferir criar o serviço manualmente, configure exatamente:
 | --- | --- |
 | Build Command | `npm ci --include=dev && npm run build` |
 | Start Command | `npm start` |
-| Health Check Path | `/health` |
+| Health Check Path | `/health/ready` |
 
 Dois detalhes são obrigatórios, e cada um causa uma falha diferente:
 
@@ -219,9 +221,22 @@ Variáveis de ambiente no Render:
 
 - `PORT` é injetado automaticamente — **não** defina manualmente
 - `NODE_ENV=production` e `CORS_ORIGIN` já vêm declarados no `render.yaml`
-- `DATABASE_URL`, `JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` estão marcadas
-  como `sync: false`: o Render pede o valor de cada uma no primeiro deploy,
-  e elas nunca são versionadas
+- `DATABASE_URL`, `DIRECT_DATABASE_URL`, `JWT_ACCESS_SECRET` e
+  `JWT_REFRESH_SECRET` estão marcadas como `sync: false`: o Render pede o
+  valor de cada uma no primeiro deploy, e elas nunca são versionadas
+
+O health check aponta para `/health/ready`, e não para `/health`. A diferença
+importa: `/health` só diz que o processo está no ar, então um deploy com
+`DATABASE_URL` errada ficaria **verde com o banco fora**, falhando apenas
+quando alguém tentasse se cadastrar. `/health/ready` consulta o banco, então
+esse deploy falha de imediato.
+
+### Neon: qual connection string usar
+
+O Neon oferece duas. Use a **pooled** (host com `-pooler`) em `DATABASE_URL`,
+e a **direta** (sem `-pooler`) em `DIRECT_DATABASE_URL`. Migrations sobre o
+endpoint agrupado podem falhar — ele é otimizado para consultas curtas, não
+para as operações de esquema.
 
 > Não use o PostgreSQL gratuito do próprio Render para dados que você quer
 > manter: esse plano expira e a instância é removida. Por isso a escolha do

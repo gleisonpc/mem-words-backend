@@ -15,7 +15,9 @@ services:
     buildCommand: npm ci --include=dev && npm run build && npx prisma migrate deploy
     startCommand: npm start
 
-    healthCheckPath: /health
+    # Aponta para a prontidão, e não para /health: assim um deploy com
+    # DATABASE_URL errada falha em vez de ficar verde com o banco fora.
+    healthCheckPath: /health/ready
 
     envVars:
       - key: NODE_VERSION
@@ -31,6 +33,10 @@ services:
       #   JWT_ACCESS_SECRET  -> openssl rand -base64 48
       #   JWT_REFRESH_SECRET -> openssl rand -base64 48 (diferente do acima)
       - key: DATABASE_URL
+        sync: false
+      # Opcional: conexão DIRETA (não agrupada), usada só pelas migrations.
+      # No Neon, é a connection string sem "-pooler" no host.
+      - key: DIRECT_DATABASE_URL
         sync: false
       - key: JWT_ACCESS_SECRET
         sync: false

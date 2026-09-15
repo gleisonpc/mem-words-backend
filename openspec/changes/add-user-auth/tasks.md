@@ -53,7 +53,15 @@
 - [x] 7.6 Confirmar a remoção em cascata ao excluir a conta
 - [x] 7.7 Confirmar que o hash da senha não aparece em nenhuma resposta
 
-## 8. Documentação
+## 8. Prontidão do deploy
 
-- [x] 8.1 Atualizar o README com rotas, variáveis e decisões de segurança
-- [x] 8.2 Atualizar o contexto do projeto no OpenSpec
+- [x] 8.1 Expor `GET /health/ready` verificando a conexão com o banco
+- [x] 8.2 Responder `503` sem vazar host, credencial ou mensagem do driver
+- [x] 8.3 Apontar o health check da plataforma para a prontidão
+- [x] 8.4 Permitir uma connection string dedicada às migrations
+- [x] 8.5 Verificar que um banco inacessível derruba a prontidão e não o `/health`
+
+## 9. Documentação
+
+- [x] 9.1 Atualizar o README com rotas, variáveis e decisões de segurança
+- [x] 9.2 Atualizar o contexto do projeto no OpenSpec
