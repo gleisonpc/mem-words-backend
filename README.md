@@ -27,6 +27,9 @@ npm start          # produção (executa dist/, exige build antes)
 npm run typecheck  # checagem de tipos sem emitir arquivos
 ```
 
+> `npm start` apenas executa `dist/`. **Rode `npm run build` antes** — sem isso
+> o Node falha com `Cannot find module dist/server.js`.
+
 O servidor sobe em `http://localhost:3000` por padrão (configurável via `PORT`).
 
 ## Endpoints
@@ -93,6 +96,41 @@ apontando para arquivos `.ts` — é o caminho do arquivo já compilado:
 ```ts
 import env from './config/env.js';
 ```
+
+## Deploy (Render)
+
+O `render.yaml` na raiz mantém a configuração versionada. Ao criar o serviço,
+use a opção **Blueprint** apontando para o repositório que o Render lê esse
+arquivo — não é preciso configurar nada pela interface.
+
+Se preferir criar o serviço manualmente, configure exatamente:
+
+| Campo | Valor |
+| --- | --- |
+| Build Command | `npm ci --include=dev && npm run build` |
+| Start Command | `npm start` |
+| Health Check Path | `/health` |
+
+Dois detalhes são obrigatórios, e cada um causa uma falha diferente:
+
+1. **O build precisa rodar.** O build command padrão do Render é só
+   `npm install`, que não compila o TypeScript. O start então quebra com
+   `Error: Cannot find module '/opt/render/project/src/dist/server.js'`.
+2. **`--include=dev` é obrigatório.** O Render define `NODE_ENV=production`,
+   e nesse modo o npm pula as `devDependencies` — onde está o `typescript`.
+   Sem a flag o build falha com `tsc: not found`.
+
+Variáveis de ambiente no Render:
+
+- `PORT` é injetado automaticamente — **não** defina manualmente
+- `NODE_ENV=production` e `CORS_ORIGIN` já vêm declarados no `render.yaml`
+
+A versão do Node é fixada em duas frentes: `.node-version` (22) e a variável
+`NODE_VERSION` no blueprint.
+
+O servidor escuta em `0.0.0.0` (e não apenas em `localhost`), senão o health
+check do Render não alcança a aplicação, e trata `SIGTERM` para encerrar as
+conexões em andamento a cada deploy.
 
 ## OpenSpec
 

@@ -1,0 +1,28 @@
+# Blueprint do Render (https://render.com/docs/blueprint-spec)
+#
+# Mantém a configuração de deploy versionada junto do código. Sem isso o
+# Render usa o build command padrão (`npm install`), que NÃO compila o
+# TypeScript — e o start falha com "Cannot find module dist/server.js".
+services:
+  - type: web
+    name: mem-words-backend
+    runtime: node
+    plan: free
+
+    # --include=dev é obrigatório: typescript é devDependency e o Render
+    # define NODE_ENV=production, que faria o npm pular as devDependencies.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Libera qualquer origem por enquanto. Ao ter a URL do frontend,
+      # troque por: https://seu-frontend.com,https://outro.com
+      - key: CORS_ORIGIN
+        value: "*"
+    # PORT é injetado automaticamente pelo Render — não declare aqui.
