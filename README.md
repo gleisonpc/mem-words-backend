@@ -243,8 +243,48 @@ desenvolvimento orientado a especificação, configurado para o **Claude Code**.
 npm install -g @fission-ai/openspec@latest
 ```
 
-- `openspec/` — specs e changes do projeto (contexto em `openspec/config.yaml`)
-- `.claude/commands/opsx/` — slash commands (`/opsx:propose`, `/opsx:apply`, ...)
-- `.claude/skills/` — skills do OpenSpec para o Claude Code
+### Como está organizado
 
-Para iniciar uma mudança: `/opsx:propose "sua ideia"`.
+```
+openspec/
+├── config.yaml              # contexto do projeto, lido pela IA ao planejar
+├── specs/                   # o que o sistema JÁ faz (baseline consolidada)
+│   ├── health-check/
+│   └── http-api-foundation/
+└── changes/
+    ├── add-user-auth/       # mudança em andamento (aguarda merge do PR)
+    └── archive/             # mudanças concluídas e consolidadas
+        └── 2026-09-15-add-api-foundation/
+```
+
+A distinção que importa: `specs/` descreve o comportamento **já entregue**;
+`changes/` descreve o que está **em andamento**. Uma mudança só vira spec ao
+ser arquivada.
+
+Cada mudança tem quatro artefatos: `proposal.md` (o quê e por quê),
+`specs/<capability>/spec.md` (requisitos em cenários WHEN/THEN),
+`design.md` (como, com as alternativas descartadas) e `tasks.md`
+(passos de implementação).
+
+### O ciclo
+
+```bash
+/opsx:propose "sua ideia"   # cria a mudança e todos os artefatos
+/opsx:apply                 # implementa, marcando as tasks
+openspec archive <nome>     # consolida os deltas em specs/ após o merge
+```
+
+Comandos úteis fora do ciclo:
+
+```bash
+openspec list               # mudanças em andamento
+openspec list --specs       # capacidades já consolidadas
+openspec validate --all     # valida specs e mudanças
+openspec show <nome>        # exibe uma mudança ou spec
+```
+
+### Convenções
+
+Os artefatos são escritos **em português**, mas as palavras-chave normativas
+(`MUST`, `MUST NOT`, `SHALL`) e os títulos estruturais ficam **em inglês** —
+é o que o `openspec validate` espera, e está declarado no `config.yaml`.

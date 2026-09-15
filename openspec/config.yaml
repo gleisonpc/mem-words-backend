@@ -1,6 +1,10 @@
 schema: spec-driven
 
 context: |
+  Language: Portuguese (Brazil)
+  All artifacts must be written in Portuguese (Brazil).
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
   Projeto: mem-words-backend — API do aplicativo que ajuda a memorizar palavras.
   Stack: Node.js 22, TypeScript 7 (strict), Express 5, PostgreSQL (Neon) com
   Prisma 7 + @prisma/adapter-pg, Zod para validação, JWT (jsonwebtoken) e
