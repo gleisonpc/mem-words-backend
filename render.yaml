@@ -11,7 +11,8 @@ services:
 
     # --include=dev é obrigatório: typescript é devDependency e o Render
     # define NODE_ENV=production, que faria o npm pular as devDependencies.
-    buildCommand: npm ci --include=dev && npm run build
+    # `prisma migrate deploy` aplica as migrations pendentes a cada deploy.
+    buildCommand: npm ci --include=dev && npm run build && npx prisma migrate deploy
     startCommand: npm start
 
     healthCheckPath: /health
@@ -25,4 +26,18 @@ services:
       # troque por: https://seu-frontend.com,https://outro.com
       - key: CORS_ORIGIN
         value: "*"
+      # Definidas no painel do Render (sync: false = não versionadas):
+      #   DATABASE_URL       -> connection string do Neon (a "pooled")
+      #   JWT_ACCESS_SECRET  -> openssl rand -base64 48
+      #   JWT_REFRESH_SECRET -> openssl rand -base64 48 (diferente do acima)
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
     # PORT é injetado automaticamente pelo Render — não declare aqui.

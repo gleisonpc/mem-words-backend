@@ -1,0 +1,47 @@
+// Schema do mem-words-backend.
+// Documentação: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(120)
+  // Guardado sempre em minúsculas para que o índice único seja
+  // case-insensitive na prática.
+  email        String   @unique @db.VarChar(255)
+  // Hash bcrypt — a senha em texto puro nunca é persistida.
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+/// Refresh tokens emitidos no login.
+///
+/// Apenas o hash SHA-256 do token é persistido: um vazamento do banco não
+/// permite reutilizar os tokens. A linha é mantida após a revogação para
+/// que a rotação consiga detectar reuso de um token já gasto.
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  userId    String    @map("user_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}

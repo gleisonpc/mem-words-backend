@@ -2,15 +2,25 @@ schema: spec-driven
 
 context: |
   Projeto: mem-words-backend — API do aplicativo que ajuda a memorizar palavras.
-  Stack: Node.js 22, TypeScript 7 (strict), Express 5, cors, dotenv.
-  Build: tsc para dist/ (module/moduleResolution nodenext, target ES2023).
+  Stack: Node.js 22, TypeScript 7 (strict), Express 5, PostgreSQL (Neon) com
+  Prisma 7 + @prisma/adapter-pg, Zod para validação, JWT (jsonwebtoken) e
+  bcryptjs para senhas.
+  Build: prisma generate + tsc para dist/ (nodenext, target ES2023).
   Dev: tsx watch. Imports relativos usam a extensão .js (exigência do nodenext).
-  Estrutura: src/app.ts (app Express), src/server.ts (bootstrap HTTP),
-  src/routes, src/controllers, src/middlewares, src/config, src/types.
-  Scripts: npm run dev, npm run build, npm start, npm run typecheck.
-  Estado atual: apenas o health-check GET /health está implementado.
-  CORS está liberado para qualquer origem e será restringido quando a URL
-  do frontend for definida (variável CORS_ORIGIN).
+  Estrutura: src/{app,server}.ts, config, controllers, services, routes,
+  middlewares, schemas, errors, lib, types. Client do Prisma gerado em
+  src/generated (fora do git).
+  Camadas: routes -> middlewares (validate/authenticate) -> controllers ->
+  services -> prisma. Controllers não acessam o banco diretamente.
+  Erros: lançar subclasses de AppError (src/errors); o errorHandler central
+  converte em { error, code, details }.
+  Auth: access token JWT curto + refresh token opaco persistido como hash
+  SHA-256, com rotação e detecção de reuso. PATCH/DELETE /users/:id só
+  operam sobre a própria conta (middleware ensureSelf).
+  Estado atual: health-check, cadastro/login/refresh/logout e CRUD do
+  próprio usuário. Listas de palavras ainda não implementadas — elas devem
+  se vincular ao usuário por FK com onDelete: Cascade.
+  CORS liberado para qualquer origem até a URL do frontend ser definida.
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.
