@@ -1,38 +1,31 @@
 import env from '../config/env.js';
 import prisma from '../lib/prisma.js';
+import { durationToMs } from '../lib/duration.js';
 import { verifyPassword } from '../lib/password.js';
 import { generateRefreshToken, hashRefreshToken, signAccessToken } from '../lib/jwt.js';
 import { UnauthorizedError } from '../errors/AppError.js';
 import type { LoginInput } from '../schemas/user.schema.js';
 import { toPublicUser, type PublicUser } from './user.service.js';
 
-export interface AuthTokens {
+/**
+ * Tudo que a emissão de tokens produz — inclui `refreshToken` em texto puro,
+ * de uso **interno**: o controller o extrai para gravar o cookie e nunca o
+ * repassa ao corpo da resposta. `AuthTokens` é o que de fato compõe o corpo.
+ */
+export interface IssuedTokens {
   accessToken: string;
   refreshToken: string;
   tokenType: 'Bearer';
   expiresIn: string;
 }
 
-export interface AuthResult extends AuthTokens {
+export type AuthTokens = Omit<IssuedTokens, 'refreshToken'>;
+
+export interface AuthResult extends IssuedTokens {
   user: PublicUser;
 }
 
-/** Converte "15m", "7d", "3600s" em milissegundos. */
-function durationToMs(duration: string): number {
-  const match = /^(\d+)([smhd])$/.exec(duration.trim());
-
-  if (match === null) {
-    throw new Error(`Duração inválida: "${duration}". Use algo como 15m, 24h ou 7d.`);
-  }
-
-  const amount = Number(match[1]);
-  const unit = match[2] as 's' | 'm' | 'h' | 'd';
-  const multipliers = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
-
-  return amount * multipliers[unit];
-}
-
-async function issueTokens(user: { id: string; email: string }): Promise<AuthTokens> {
+async function issueTokens(user: { id: string; email: string }): Promise<IssuedTokens> {
   const refreshToken = generateRefreshToken();
 
   await prisma.refreshToken.create({
@@ -75,7 +68,7 @@ export async function login(input: LoginInput): Promise<AuthResult> {
  * é emitido. A linha antiga é mantida no banco para que a reapresentação
  * de um token já gasto seja detectável.
  */
-export async function refresh(presentedToken: string): Promise<AuthTokens> {
+export async function refresh(presentedToken: string): Promise<IssuedTokens> {
   const stored = await prisma.refreshToken.findUnique({
     where: { tokenHash: hashRefreshToken(presentedToken) },
     include: { user: true },

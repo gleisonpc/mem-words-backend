@@ -1,43 +1,4 @@
-# user-auth Specification
-
-## Purpose
-Estabelecer e verificar a identidade de quem usa a aplicação, para que os
-dados de cada pessoa — hoje a conta, adiante as listas de palavras — possam
-ser atribuídos a ela e protegidos de acesso alheio.
-
-## Requirements
-
-### Requirement: Cadastro de usuário
-
-O sistema MUST permitir criar uma conta a partir de nome, e-mail e senha.
-
-O e-mail MUST ser único e normalizado (sem espaços nas pontas, em minúsculas)
-antes da validação e da gravação, para que o mesmo endereço digitado de formas
-diferentes não gere contas duplicadas.
-
-A senha MUST ser armazenada apenas como hash; o texto puro MUST NOT ser
-persistido nem devolvido em qualquer resposta.
-
-#### Scenario: Cadastro bem-sucedido
-
-- **WHEN** chega um cadastro com nome, e-mail e senha válidos
-- **THEN** a conta é criada, a resposta é `201` e o corpo traz os dados do
-  usuário sem o hash da senha
-
-#### Scenario: E-mail com variação de caixa ou espaços
-
-- **WHEN** o e-mail é enviado como `"  PESSOA@Exemplo.com "`
-- **THEN** ele é gravado como `pessoa@exemplo.com`
-
-#### Scenario: E-mail já cadastrado
-
-- **WHEN** o e-mail informado já pertence a outra conta
-- **THEN** a resposta é `409` e nenhuma conta é criada
-
-#### Scenario: Dados inválidos
-
-- **WHEN** o nome, o e-mail ou a senha não atendem às regras de formato
-- **THEN** a resposta é `400`, indicando qual campo falhou e por quê
+## MODIFIED Requirements
 
 ### Requirement: Autenticação por credenciais
 
@@ -67,34 +28,6 @@ inexistente e senha incorreta — tanto na mensagem quanto no tempo de resposta
 
 - **WHEN** o e-mail informado não pertence a nenhuma conta
 - **THEN** a resposta é `401` com a mesma mensagem do cenário anterior
-
-### Requirement: Proteção de rotas por token de acesso
-
-Rotas que operam sobre dados de um usuário MUST exigir um token de acesso
-válido apresentado no cabeçalho `Authorization`.
-
-O sistema MUST recusar tokens ausentes, malformados, expirados ou assinados
-com outro segredo.
-
-#### Scenario: Token válido
-
-- **WHEN** a requisição traz um token de acesso válido
-- **THEN** ela é processada em nome do usuário identificado pelo token
-
-#### Scenario: Token ausente
-
-- **WHEN** a requisição não traz o cabeçalho `Authorization`
-- **THEN** a resposta é `401`
-
-#### Scenario: Token forjado
-
-- **WHEN** o token foi assinado com um segredo diferente do da aplicação
-- **THEN** a resposta é `401`
-
-#### Scenario: Token expirado
-
-- **WHEN** o token de acesso já passou da validade
-- **THEN** a resposta é `401`
 
 ### Requirement: Renovação de sessão com rotação
 
@@ -128,24 +61,6 @@ vazamento do banco não permita reutilizá-lo.
 - **WHEN** a requisição de renovação não traz o cookie do token de renovação
 - **THEN** a resposta é `401`
 
-### Requirement: Detecção de reuso de token de renovação
-
-Reapresentar um token de renovação já consumido indica que ele vazou. O
-sistema MUST tratar isso como comprometimento e revogar todas as sessões
-ativas do usuário.
-
-#### Scenario: Token já utilizado é reapresentado
-
-- **WHEN** um token de renovação que já foi trocado é apresentado de novo
-- **THEN** a resposta é `401` e todas as sessões ativas daquele usuário são
-  revogadas
-
-#### Scenario: Sessão legítima também cai
-
-- **WHEN** as sessões foram revogadas por detecção de reuso
-- **THEN** o token de renovação emitido mais recentemente também deixa de
-  funcionar, exigindo novo login
-
 ### Requirement: Encerramento de sessão
 
 O sistema MUST permitir revogar o token de renovação apresentado pelo cookie,
@@ -172,6 +87,8 @@ revogar nada.
   renovação
 - **THEN** a resposta é `204` sem nenhuma tentativa de revogação
 
+## ADDED Requirements
+
 ### Requirement: Cookie do token de renovação
 
 O cookie que carrega o token de renovação MUST ser `HttpOnly`, `Secure` e
@@ -194,22 +111,3 @@ carrega.
 
 - **WHEN** o cookie é emitido
 - **THEN** seu caminho restringe o envio às rotas de autenticação
-
-### Requirement: Segredos de assinatura obrigatórios
-
-O sistema MUST exigir segredos distintos para os tokens de acesso e de
-renovação, e MUST recusar iniciar quando algum estiver ausente.
-
-Em produção, cada segredo MUST ter comprimento mínimo suficiente para
-inviabilizar força bruta.
-
-#### Scenario: Segredo ausente
-
-- **WHEN** a aplicação inicia sem um dos segredos configurados
-- **THEN** ela falha na inicialização com uma mensagem indicando a variável
-  faltante
-
-#### Scenario: Segredos iguais
-
-- **WHEN** os dois segredos configurados são idênticos
-- **THEN** a aplicação falha na inicialização

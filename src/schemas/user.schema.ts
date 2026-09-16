@@ -58,10 +58,6 @@ export const userIdParamSchema = z.object({
   params: z.object({ id: z.uuid('Id de usuário inválido.') }),
 });
 
-export const refreshSchema = z.object({
-  body: z.object({ refreshToken: z.string().min(1, 'Informe o refreshToken.') }),
-});
-
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];
 export type LoginInput = z.infer<typeof loginSchema>['body'];
 export type UpdateUserInput = z.infer<typeof updateUserSchema>['body'];
