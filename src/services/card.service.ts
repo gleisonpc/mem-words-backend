@@ -13,6 +13,12 @@ export interface PublicCard {
   exampleTranslation: string | null;
   personalNote: string | null;
   state: string;
+  // Agendamento de revisão espaçada — ver src/lib/scheduling.ts. `dueAt` é
+  // `null` enquanto o card nunca recebeu nota (`state: "new"`).
+  learningStep: number;
+  easeFactor: number;
+  intervalDays: number;
+  dueAt: Date | null;
   deckId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -25,7 +31,7 @@ export interface PaginatedCards {
   pageSize: number;
 }
 
-function toPublicCard(card: Card): PublicCard {
+export function toPublicCard(card: Card): PublicCard {
   return {
     id: card.id,
     word: card.word,
@@ -36,14 +42,23 @@ function toPublicCard(card: Card): PublicCard {
     exampleTranslation: card.exampleTranslation,
     personalNote: card.personalNote,
     state: card.state,
+    learningStep: card.learningStep,
+    easeFactor: card.easeFactor,
+    intervalDays: card.intervalDays,
+    dueAt: card.dueAt,
     deckId: card.deckId,
     createdAt: card.createdAt,
     updatedAt: card.updatedAt,
   };
 }
 
-/** Garante que o baralho existe e pertence a `userId`, sem carregar cards. */
-async function ensureDeckOwnership(deckId: string, userId: string): Promise<void> {
+/**
+ * Garante que o baralho existe e pertence a `userId`, sem carregar cards.
+ *
+ * Exportada porque `review.service.ts` precisa da mesma checagem para
+ * montar a fila de revisão de um baralho.
+ */
+export async function ensureDeckOwnership(deckId: string, userId: string): Promise<void> {
   const deck = await prisma.deck.findUnique({ where: { id: deckId } });
 
   if (deck === null) {
@@ -102,8 +117,11 @@ export async function createCard(
 /**
  * Resolve um card verificando a posse pelo dono do baralho, em uma única
  * consulta — evita duas idas ao banco (uma para o card, outra para o dono).
+ *
+ * Exportada porque `review.service.ts` precisa da mesma resolução para
+ * registrar uma nota — não há motivo para duplicar a consulta.
  */
-async function findCardOrThrow(id: string, userId: string): Promise<Card> {
+export async function findCardOrThrow(id: string, userId: string): Promise<Card> {
   const card = await prisma.card.findUnique({
     where: { id },
     include: { deck: true },
