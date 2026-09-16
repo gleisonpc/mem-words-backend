@@ -69,6 +69,8 @@ Exigem o header `Authorization: Bearer <accessToken>`.
 | `GET` | `/cards/:id` | Detalhe de um card |
 | `PATCH` | `/cards/:id` | Edita um card |
 | `DELETE` | `/cards/:id` | Exclui um card → `204` |
+| `GET` | `/decks/:id/reviews/queue` | Cards prontos para revisão agora, cada um com a prévia das 4 notas |
+| `POST` | `/cards/:id/reviews` | Registra uma nota (`again`/`hard`/`good`/`easy`) → card atualizado |
 
 `PATCH` e `DELETE` só funcionam sobre a **própria** conta: usar o id de outro
 usuário devolve `403`, mesmo com um token válido. O mesmo vale para
@@ -127,6 +129,29 @@ Decisões de segurança relevantes:
 | Login com mensagem genérica | não revela quais e-mails estão cadastrados |
 | Troca de senha exige `currentPassword` | um access token roubado não basta para assumir a conta |
 | Troca de senha revoga as sessões abertas | derruba quem estava logado em outros dispositivos |
+
+## Revisão espaçada
+
+Variante fixa e simplificada do SM-2 (estilo Anki) — parâmetros embutidos em
+`src/lib/scheduling.ts`, não configuráveis pelo usuário nesta versão.
+
+- **`new`** → recebe qualquer nota → **`learning`**, no primeiro dos passos
+  curtos (`1min`, `10min`).
+- **`learning`**: `again` volta ao primeiro passo; `hard` repete o passo
+  atual; `good` avança ao próximo passo ou gradua para `review`; `easy`
+  gradua direto, pulando os passos restantes.
+- **`review`** (intervalo em dias, fator de facilidade): `again` volta a
+  `learning` e reduz o fator de facilidade; `hard`/`good`/`easy` recalculam
+  o intervalo a partir do fator de facilidade (reduzindo, mantendo ou
+  aumentando-o, respectivamente), até um teto fixo.
+
+`GET /decks/:id/reviews/queue` traz os cards prontos agora (`new`, ou
+`learning`/`review` com `dueAt` vencido) com a prévia do resultado de cada
+uma das quatro notas — o mesmo cálculo de `POST /cards/:id/reviews`, só que
+sem gravar nada.
+
+Nenhum histórico de revisões é persistido — o card guarda só seu estado
+atual.
 
 ## Banco de dados
 

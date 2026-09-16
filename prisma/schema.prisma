@@ -63,11 +63,14 @@ model Deck {
   @@map("decks")
 }
 
-/// Único valor hoje (`new`); o change de revisão espaçada (SRS) adiciona
-/// `learning`/`review`/`suspended` a este mesmo enum via migration, em vez
-/// de trocar o tipo da coluna depois.
+/// `new`: ainda não estudado. `learning`: nos passos curtos de aprendizado
+/// (minutos). `review`: graduado, intervalo em dias. Sem `suspended` — é
+/// uma ação manual sem tela nesta mudança; ver design.md do change
+/// `add-review-scheduling`.
 enum CardState {
   new
+  learning
+  review
 
   @@map("card_state")
 }
@@ -82,6 +85,16 @@ model Card {
   exampleTranslation String?   @map("example_translation")
   personalNote       String?   @map("personal_note")
   state              CardState @default(new)
+  // Agendamento de revisão espaçada — ver src/lib/scheduling.ts.
+  // `learningStep`: índice do passo atual em `learning` (irrelevante fora
+  // desse estado). `easeFactor`: multiplicador do intervalo em `review`.
+  // `intervalDays`: intervalo atual, em dias (fracionário só por causa do
+  // fator de facilidade). `dueAt`: quando o card volta a ficar pronto para
+  // revisão; `null` enquanto o card nunca recebeu nota (`new`).
+  learningStep       Int       @default(0) @map("learning_step")
+  easeFactor         Float     @default(2.5) @map("ease_factor")
+  intervalDays       Float     @default(0) @map("interval_days")
+  dueAt              DateTime? @map("due_at")
   deckId             String    @map("deck_id") @db.Uuid
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
@@ -89,5 +102,6 @@ model Card {
   deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
   @@index([deckId])
+  @@index([dueAt])
   @@map("cards")
 }
