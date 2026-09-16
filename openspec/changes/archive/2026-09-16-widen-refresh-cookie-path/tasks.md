@@ -15,11 +15,13 @@
       `Path=/` é superconjunto de `Path=/auth`, não deveria quebrar nada.
       Confirmado com Postgres local: cadastro, login, e `POST /auth/refresh`
       usando o cookie jar do curl respondeu `200`.
-- [ ] 2.3 Depois do deploy, repetir contra produção a reprodução do
+- [x] 2.3 Depois do deploy, repetido contra produção a reprodução do
       problema: Playwright com `--test-third-party-cookie-phaseout`,
-      cadastro pelo frontend (que chama por `/api/auth/...`), recarregar a
-      página e confirmar que a sessão sobrevive — a renovação responde `200`
-      em vez de `401`.
+      cadastro pelo frontend (chamando por `/api/auth/...`), recarregada a
+      página — a sessão sobrevive. `POST /api/auth/refresh` agora envia o
+      cookie (`Path=/` casa com `/api/auth/refresh`) e responde `200`; a
+      página recarregada mostra a tela autenticada, não o formulário de
+      login.
 
 ## 3. Verificação final
 
