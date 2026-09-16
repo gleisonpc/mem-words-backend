@@ -59,9 +59,24 @@ Exigem o header `Authorization: Bearer <accessToken>`.
 | `GET` | `/users/me` | Dados do usuário autenticado |
 | `PATCH` | `/users/:id` | Edita a própria conta |
 | `DELETE` | `/users/:id` | Exclui a própria conta → `204` |
+| `GET` | `/decks` | Lista os baralhos do usuário autenticado |
+| `POST` | `/decks` | Cria um baralho → `201` |
+| `GET` | `/decks/:id` | Detalhe de um baralho (inclui `cardCount`) |
+| `PATCH` | `/decks/:id` | Edita nome e/ou par de idiomas |
+| `DELETE` | `/decks/:id` | Exclui o baralho e seus cards em cascata → `204` |
+| `GET` | `/decks/:id/cards` | Lista os cards do baralho, paginado (`page`, `pageSize`) |
+| `POST` | `/decks/:id/cards` | Cria um card no baralho → `201` |
+| `GET` | `/cards/:id` | Detalhe de um card |
+| `PATCH` | `/cards/:id` | Edita um card |
+| `DELETE` | `/cards/:id` | Exclui um card → `204` |
 
 `PATCH` e `DELETE` só funcionam sobre a **própria** conta: usar o id de outro
-usuário devolve `403`, mesmo com um token válido.
+usuário devolve `403`, mesmo com um token válido. O mesmo vale para
+baralhos e cards: só o dono acessa, edita ou exclui os próprios.
+
+Para baralhos e cards, um `id` que não existe responde `404`; um `id` que
+existe mas pertence a outro usuário responde `403` — a resposta não
+esconde a existência do recurso, ela só recusa o acesso.
 
 ### Exemplo de fluxo
 
