@@ -9,7 +9,11 @@ import { durationToMs } from './duration.js';
  * `HttpOnly` + `Secure` + `SameSite=None` é o conjunto necessário para um
  * cookie legível entre origens diferentes (frontend e backend em domínios
  * distintos) e ilegível por JavaScript — o ponto inteiro desta mudança.
- * `Path=/auth` restringe o envio às rotas que de fato precisam dele.
+ * `Path=/` (não um subcaminho como `/auth`) porque o backend não sabe qual
+ * caminho o navegador realmente usa para chegar aqui — um proxy na frente
+ * (como o rewrite `/api/*` da Vercel) prefixa as rotas de um jeito que este
+ * backend não controla, e um `Path` mais restrito que esse caminho real faz
+ * o navegador simplesmente não enviar o cookie.
  *
  * Sempre os mesmos atributos, sem depender de `NODE_ENV`: a topologia real
  * (Vercel + Render) é cross-site em qualquer ambiente que não seja
@@ -22,7 +26,7 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: true,
   sameSite: 'none' as const,
-  path: '/auth',
+  path: '/',
 };
 
 /**
