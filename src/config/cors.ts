@@ -3,11 +3,31 @@ import type { CorsOptions } from 'cors';
 import env from './env.js';
 
 /**
+ * Converte uma entrada de `CORS_ORIGIN` com `*` em uma expressão regular
+ * ancorada, tratando o curinga como "qualquer sequência de caracteres".
+ *
+ * Escapa todo caractere especial de regex antes de trocar `*` por `.*` — sem
+ * isso, o `.` do domínio casaria qualquer caractere, e um padrão como
+ * `https://app.exemplo.com` aceitaria também `https://appXexemploXcom`.
+ */
+function patternToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, (char) =>
+    char === '*' ? '.*' : `\\${char}`,
+  );
+
+  return new RegExp(`^${escaped}$`);
+}
+
+/**
  * Opções de CORS.
  *
  * Por enquanto qualquer origem é liberada. Quando a URL do frontend estiver
  * definida, basta preencher CORS_ORIGIN (uma ou mais origens separadas por
  * vírgula) que a lista passa a ser aplicada, sem alterar o código.
+ *
+ * Uma entrada pode conter `*` para casar uma família de origens que muda a
+ * cada deploy — como as URLs de revisão que a Vercel gera por branch ou por
+ * build — sem exigir atualizar a lista a cada nova URL.
  */
 export function buildCorsOptions(): CorsOptions {
   const configured = env.corsOrigin.trim();
@@ -18,7 +38,8 @@ export function buildCorsOptions(): CorsOptions {
       : configured
           .split(',')
           .map((value) => value.trim())
-          .filter(Boolean);
+          .filter(Boolean)
+          .map((value) => (value.includes('*') ? patternToRegExp(value) : value));
 
   return {
     origin,

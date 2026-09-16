@@ -24,10 +24,16 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
-      # Libera qualquer origem por enquanto. Ao ter a URL do frontend,
-      # troque por: https://seu-frontend.com,https://outro.com
+      # Origem de produção do frontend, mais um padrão (com "*") cobrindo os
+      # deploys de revisão que a Vercel gera por branch e por build — sem o
+      # padrão, cada PR do frontend precisaria de uma entrada nova aqui.
+      #
+      # O domínio de produção abaixo é o padrão que a Vercel atribui a um
+      # projeto sem domínio customizado (dado o nome do projeto observado
+      # nos deploys, "mem-words-frontend"), não uma confirmação — se o
+      # frontend usar outro domínio, troque só este valor.
       - key: CORS_ORIGIN
-        value: "*"
+        value: "https://mem-words-frontend.vercel.app,https://mem-words-frontend-*-memo-65b2.vercel.app"
       # Definidas no painel do Render (sync: false = não versionadas):
       #   DATABASE_URL       -> connection string do Neon (a "pooled")
       #   JWT_ACCESS_SECRET  -> openssl rand -base64 48

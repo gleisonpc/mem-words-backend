@@ -15,6 +15,11 @@ frontend não estiver definida.
 A lista de origens permitidas MUST ser configurável por variável de ambiente,
 de modo que restringir o acesso não exija alteração de código.
 
+Uma entrada da lista MUST poder ser um padrão com `*` representando qualquer
+sequência de caracteres, para cobrir famílias de origens que mudam a cada
+deploy — como as URLs de revisão que uma plataforma de hospedagem gera por
+branch ou por build — sem exigir atualizar a lista a cada nova URL.
+
 #### Scenario: Qualquer origem liberada
 
 - **WHEN** `CORS_ORIGIN` está vazio ou é `*` e chega uma requisição de uma
@@ -26,6 +31,20 @@ de modo que restringir o acesso não exija alteração de código.
 - **WHEN** `CORS_ORIGIN` lista origens específicas e a requisição vem de uma
   delas
 - **THEN** a resposta inclui `Access-Control-Allow-Origin` com aquela origem
+
+#### Scenario: Origem permitida por padrão com curinga
+
+- **WHEN** `CORS_ORIGIN` inclui uma entrada com `*` e a origem da requisição
+  corresponde ao padrão
+- **THEN** a resposta inclui `Access-Control-Allow-Origin` com a origem da
+  requisição
+
+#### Scenario: Origem não corresponde ao padrão
+
+- **WHEN** `CORS_ORIGIN` inclui uma entrada com `*` e a origem da requisição
+  não corresponde ao padrão
+- **THEN** a resposta não inclui `Access-Control-Allow-Origin`, e o navegador
+  bloqueia a leitura do corpo
 
 #### Scenario: Origem não permitida
 
