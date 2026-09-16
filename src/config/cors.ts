@@ -31,20 +31,25 @@ function patternToRegExp(pattern: string): RegExp {
  */
 export function buildCorsOptions(): CorsOptions {
   const configured = env.corsOrigin.trim();
+  const anyOriginAllowed = configured === '' || configured === '*';
 
-  const origin: CorsOptions['origin'] =
-    configured === '' || configured === '*'
-      ? '*'
-      : configured
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean)
-          .map((value) => (value.includes('*') ? patternToRegExp(value) : value));
+  const origin: CorsOptions['origin'] = anyOriginAllowed
+    ? '*'
+    : configured
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => (value.includes('*') ? patternToRegExp(value) : value));
 
   return {
     origin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false,
+    // Credenciais (o cookie do token de renovação) só acompanham uma lista de
+    // origens específica. `Access-Control-Allow-Origin: *` com
+    // `Access-Control-Allow-Credentials: true` é uma combinação que o próprio
+    // navegador recusa — e liberá-la do mesmo jeito exporia o cookie de
+    // sessão a qualquer site que fizesse a requisição.
+    credentials: !anyOriginAllowed,
   };
 }
