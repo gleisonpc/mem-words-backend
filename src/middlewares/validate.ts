@@ -34,15 +34,29 @@ export function validate(schema: ZodType): RequestHandler {
     const parsed = result.data as {
       body?: unknown;
       params?: Record<string, string>;
+      query?: Record<string, unknown>;
     };
 
     if (parsed.body !== undefined) {
       req.body = parsed.body;
     }
 
-    // req.params é somente-leitura no Express 5; copiamos campo a campo.
+    // req.params e req.query são somente-leitura no Express 5; copiamos
+    // campo a campo em vez de reatribuir.
     if (parsed.params !== undefined) {
       Object.assign(req.params, parsed.params);
+    }
+
+    // req.query é um getter que reparseia a query string a cada leitura
+    // (não guarda o valor) — Object.assign nele mutaria um objeto descartado
+    // na hora. Precisamos substituir a própria propriedade.
+    if (parsed.query !== undefined) {
+      Object.defineProperty(req, 'query', {
+        value: parsed.query,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
 
     next();

@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 
 import { verifyAccessToken } from '../lib/jwt.js';
 import { ForbiddenError, UnauthorizedError } from '../errors/AppError.js';
@@ -30,6 +30,20 @@ export const authenticate: RequestHandler = (req, _res, next) => {
     next(error);
   }
 };
+
+/**
+ * Lê `req.user` já validado por `authenticate`.
+ *
+ * Toda rota que usa isso está atrás de `authenticate` — o `undefined` aqui
+ * só existiria por erro de montagem de rota, não por requisição sem token.
+ */
+export function requireUser(req: Request): { id: string; email: string } {
+  if (req.user === undefined) {
+    throw new UnauthorizedError('Token de acesso ausente.');
+  }
+
+  return req.user;
+}
 
 /**
  * Garante que o usuário autenticado é o dono do recurso em `:id`.
