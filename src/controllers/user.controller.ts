@@ -29,7 +29,8 @@ export const update: RequestHandler = async (req, res, next) => {
 /** DELETE /users/:id */
 export const remove: RequestHandler = async (req, res, next) => {
   try {
-    await userService.deleteUser(req.params['id'] as string);
+    const { currentPassword } = req.body as { currentPassword: string };
+    await userService.deleteUser(req.params['id'] as string, currentPassword);
     res.status(204).send();
   } catch (error) {
     next(error);
