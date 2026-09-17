@@ -101,13 +101,19 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<Pu
   return toPublicUser(updated);
 }
 
-export async function deleteUser(id: string): Promise<void> {
+export async function deleteUser(id: string, currentPassword: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id } });
 
   if (user === null) {
     throw new NotFoundError('Usuário não encontrado.');
   }
 
-  // Os refresh tokens caem junto por onDelete: Cascade.
+  // Mesmo motivo da troca de senha: um token de acesso obtido indevidamente
+  // não pode bastar para uma ação irreversível na conta.
+  if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+    throw new UnauthorizedError('Senha atual incorreta.');
+  }
+
+  // Os baralhos, cards e refresh tokens caem junto por onDelete: Cascade.
   await prisma.user.delete({ where: { id } });
 }

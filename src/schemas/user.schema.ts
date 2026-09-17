@@ -54,10 +54,15 @@ export const updateUserSchema = z.object({
     }),
 });
 
-export const userIdParamSchema = z.object({
+export const deleteUserSchema = z.object({
   params: z.object({ id: z.uuid('Id de usuário inválido.') }),
+  body: z.object({
+    /** Exigida para confirmar a exclusão — mesmo motivo da troca de senha. */
+    currentPassword: z.string().min(1, 'Informe a senha atual.'),
+  }),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];
 export type LoginInput = z.infer<typeof loginSchema>['body'];
 export type UpdateUserInput = z.infer<typeof updateUserSchema>['body'];
+export type DeleteUserInput = z.infer<typeof deleteUserSchema>['body'];
