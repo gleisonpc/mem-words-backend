@@ -64,9 +64,9 @@ model Deck {
 }
 
 /// `new`: ainda não estudado. `learning`: nos passos curtos de aprendizado
-/// (minutos). `review`: graduado, intervalo em dias. Sem `suspended` — é
-/// uma ação manual sem tela nesta mudança; ver design.md do change
-/// `add-review-scheduling`.
+/// (minutos). `review`: graduado, intervalo em dias. Suspensão é ortogonal
+/// a este enum — ver campo `suspended` em `Card` e o change
+/// `add-card-suspension-and-difficulty`.
 enum CardState {
   new
   learning
@@ -75,29 +75,48 @@ enum CardState {
   @@map("card_state")
 }
 
+/// Nota de uma revisão (`review.service.ts`). Persistida em `Card.lastGrade`
+/// só para classificar "difícil" (`lastGrade: hard` em `review`) — não é um
+/// histórico completo, ver design.md do change
+/// `add-card-suspension-and-difficulty`.
+enum ReviewGrade {
+  again
+  hard
+  good
+  easy
+
+  @@map("review_grade")
+}
+
 model Card {
-  id                 String    @id @default(uuid()) @db.Uuid
-  word               String    @db.VarChar(200)
-  translation        String    @db.VarChar(200)
-  partOfSpeech       String?   @map("part_of_speech") @db.VarChar(40)
-  synonyms           String[]  @default([])
-  exampleSentence    String?   @map("example_sentence")
-  exampleTranslation String?   @map("example_translation")
-  personalNote       String?   @map("personal_note")
-  state              CardState @default(new)
+  id                 String       @id @default(uuid()) @db.Uuid
+  word               String       @db.VarChar(200)
+  translation        String       @db.VarChar(200)
+  partOfSpeech       String?      @map("part_of_speech") @db.VarChar(40)
+  synonyms           String[]     @default([])
+  exampleSentence    String?      @map("example_sentence")
+  exampleTranslation String?      @map("example_translation")
+  personalNote       String?      @map("personal_note")
+  state              CardState    @default(new)
   // Agendamento de revisão espaçada — ver src/lib/scheduling.ts.
   // `learningStep`: índice do passo atual em `learning` (irrelevante fora
   // desse estado). `easeFactor`: multiplicador do intervalo em `review`.
   // `intervalDays`: intervalo atual, em dias (fracionário só por causa do
   // fator de facilidade). `dueAt`: quando o card volta a ficar pronto para
   // revisão; `null` enquanto o card nunca recebeu nota (`new`).
-  learningStep       Int       @default(0) @map("learning_step")
-  easeFactor         Float     @default(2.5) @map("ease_factor")
-  intervalDays       Float     @default(0) @map("interval_days")
-  dueAt              DateTime? @map("due_at")
-  deckId             String    @map("deck_id") @db.Uuid
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  learningStep       Int          @default(0) @map("learning_step")
+  easeFactor         Float        @default(2.5) @map("ease_factor")
+  intervalDays       Float        @default(0) @map("interval_days")
+  dueAt              DateTime?    @map("due_at")
+  // Suspender é uma ação manual e reversível, ortogonal ao agendamento
+  // acima — suspender/reativar não toca em nenhum dos campos de cima.
+  suspended          Boolean      @default(false)
+  // Nota da revisão mais recente, `null` até a primeira (`state: new`).
+  // Usada só para classificar "difícil" (ver `card.service.ts`).
+  lastGrade          ReviewGrade? @map("last_grade")
+  deckId             String       @map("deck_id") @db.Uuid
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
 

@@ -1,7 +1,10 @@
-import type { Card } from '../generated/prisma/client.js';
+import type { Card, Prisma } from '../generated/prisma/client.js';
 import prisma from '../lib/prisma.js';
 import { ForbiddenError, NotFoundError } from '../errors/AppError.js';
+import { MATURE_INTERVAL_DAYS } from '../lib/scheduling.js';
 import type { CreateCardInput, UpdateCardInput } from '../schemas/card.schema.js';
+
+export type CardStatus = 'suspended' | 'new' | 'learning' | 'difficult' | 'mature' | 'reviewing';
 
 export interface PublicCard {
   id: string;
@@ -19,6 +22,10 @@ export interface PublicCard {
   easeFactor: number;
   intervalDays: number;
   dueAt: Date | null;
+  suspended: boolean;
+  lastGrade: string | null;
+  // Classificação calculada — ver `deriveCardStatus`.
+  status: CardStatus;
   deckId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +36,68 @@ export interface PaginatedCards {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/**
+ * Classifica um card num único status, na ordem de prioridade do spec de
+ * `cards`: suspenso vence qualquer outra coisa; `difficult` (última nota
+ * `hard` em `review`) vence `mature`, mesmo com intervalo maduro.
+ */
+export function deriveCardStatus(card: {
+  suspended: boolean;
+  state: string;
+  lastGrade: string | null;
+  intervalDays: number;
+}): CardStatus {
+  if (card.suspended) {
+    return 'suspended';
+  }
+
+  if (card.state === 'new') {
+    return 'new';
+  }
+
+  if (card.state === 'learning') {
+    return 'learning';
+  }
+
+  if (card.lastGrade === 'hard') {
+    return 'difficult';
+  }
+
+  return card.intervalDays >= MATURE_INTERVAL_DAYS ? 'mature' : 'reviewing';
+}
+
+/**
+ * Traduz um `CardStatus` na combinação de colunas reais que o produz —
+ * usada para filtrar `GET /decks/:id/cards?status=`, já que `status` não é
+ * coluna. Mesma prioridade de `deriveCardStatus`, na direção oposta.
+ */
+export function statusWhereClause(status: CardStatus): Prisma.CardWhereInput {
+  switch (status) {
+    case 'suspended':
+      return { suspended: true };
+    case 'new':
+      return { suspended: false, state: 'new' };
+    case 'learning':
+      return { suspended: false, state: 'learning' };
+    case 'difficult':
+      return { suspended: false, state: 'review', lastGrade: 'hard' };
+    case 'mature':
+      return {
+        suspended: false,
+        state: 'review',
+        lastGrade: { not: 'hard' },
+        intervalDays: { gte: MATURE_INTERVAL_DAYS },
+      };
+    case 'reviewing':
+      return {
+        suspended: false,
+        state: 'review',
+        lastGrade: { not: 'hard' },
+        intervalDays: { lt: MATURE_INTERVAL_DAYS },
+      };
+  }
 }
 
 export function toPublicCard(card: Card): PublicCard {
@@ -46,6 +115,9 @@ export function toPublicCard(card: Card): PublicCard {
     easeFactor: card.easeFactor,
     intervalDays: card.intervalDays,
     dueAt: card.dueAt,
+    suspended: card.suspended,
+    lastGrade: card.lastGrade,
+    status: deriveCardStatus(card),
     deckId: card.deckId,
     createdAt: card.createdAt,
     updatedAt: card.updatedAt,
@@ -75,17 +147,24 @@ export async function listCardsByDeck(
   userId: string,
   page: number,
   pageSize: number,
+  filters: { q?: string; status?: CardStatus } = {},
 ): Promise<PaginatedCards> {
   await ensureDeckOwnership(deckId, userId);
 
+  const where: Prisma.CardWhereInput = {
+    deckId,
+    ...(filters.q !== undefined && { word: { contains: filters.q, mode: 'insensitive' } }),
+    ...(filters.status !== undefined && statusWhereClause(filters.status)),
+  };
+
   const [items, total] = await Promise.all([
     prisma.card.findMany({
-      where: { deckId },
+      where,
       orderBy: { createdAt: 'asc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
-    prisma.card.count({ where: { deckId } }),
+    prisma.card.count({ where }),
   ]);
 
   return { items: items.map(toPublicCard), total, page, pageSize };
@@ -140,6 +219,29 @@ export async function findCardOrThrow(id: string, userId: string): Promise<Card>
 
 export async function getCardForUser(id: string, userId: string): Promise<PublicCard> {
   return toPublicCard(await findCardOrThrow(id, userId));
+}
+
+/**
+ * Suspende ou reativa um card — ação manual e reversível, ortogonal ao
+ * agendamento de revisão (`state`/`learningStep`/`easeFactor`/
+ * `intervalDays`/`dueAt`, nenhum dos quais é tocado aqui). Idempotente:
+ * suspender um card já suspenso, ou reativar um já ativo, só confirma o
+ * estado atual, sem erro.
+ */
+async function setSuspended(id: string, userId: string, suspended: boolean): Promise<PublicCard> {
+  await findCardOrThrow(id, userId);
+
+  const updated = await prisma.card.update({ where: { id }, data: { suspended } });
+
+  return toPublicCard(updated);
+}
+
+export function suspendCard(id: string, userId: string): Promise<PublicCard> {
+  return setSuspended(id, userId, true);
+}
+
+export function unsuspendCard(id: string, userId: string): Promise<PublicCard> {
+  return setSuspended(id, userId, false);
 }
 
 export async function updateCard(

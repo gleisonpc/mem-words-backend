@@ -30,6 +30,7 @@ export async function getReviewQueue(deckId: string, userId: string): Promise<Qu
   const cards = await prisma.card.findMany({
     where: {
       deckId,
+      suspended: false,
       OR: [{ state: 'new' }, { dueAt: { lte: now } }],
     },
   });
@@ -65,6 +66,7 @@ export async function recordReview(
       easeFactor: schedule.easeFactor,
       intervalDays: schedule.intervalDays,
       dueAt: schedule.dueAt,
+      lastGrade: grade,
     },
   });
 

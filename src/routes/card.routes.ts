@@ -24,4 +24,7 @@ router.get('/cards/:id', validate(cardIdParamSchema), cardController.getById);
 router.patch('/cards/:id', validate(updateCardSchema), cardController.update);
 router.delete('/cards/:id', validate(cardIdParamSchema), cardController.remove);
 
+router.post('/cards/:id/suspend', validate(cardIdParamSchema), cardController.suspend);
+router.post('/cards/:id/unsuspend', validate(cardIdParamSchema), cardController.unsuspend);
+
 export default router;
