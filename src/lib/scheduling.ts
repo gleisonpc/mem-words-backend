@@ -46,6 +46,13 @@ export const MIN_EASE = 1.3;
 /** Teto do intervalo em `review`, em dias. */
 export const MAX_INTERVAL_DAYS = 180;
 
+/**
+ * A partir de quantos dias de intervalo um card em `review` é considerado
+ * "maduro" — mesmo corte usado pelo Anki, de onde vêm as demais constantes
+ * deste motor.
+ */
+export const MATURE_INTERVAL_DAYS = 21;
+
 function addMinutes(now: Date, minutes: number): Date {
   return new Date(now.getTime() + minutes * 60_000);
 }
