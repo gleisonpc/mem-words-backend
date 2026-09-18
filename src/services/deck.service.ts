@@ -1,4 +1,4 @@
-import type { Deck } from '../generated/prisma/client.js';
+import type { Deck, Prisma } from '../generated/prisma/client.js';
 import prisma from '../lib/prisma.js';
 import { ForbiddenError, NotFoundError } from '../errors/AppError.js';
 import { MATURE_INTERVAL_DAYS } from '../lib/scheduling.js';
@@ -13,15 +13,17 @@ export interface PublicDeck {
   updatedAt: Date;
 }
 
-export interface PublicDeckWithCardCount extends PublicDeck {
-  cardCount: number;
-}
-
-export interface PublicDeckWithStats extends PublicDeck {
+export interface DeckCardStats {
   cardCount: number;
   dueCount: number;
+  newCount: number;
+  learningCount: number;
   matureCount: number;
+  suspendedCount: number;
 }
+
+export type PublicDeckWithCardCount = PublicDeck & DeckCardStats;
+export type PublicDeckWithStats = PublicDeck & DeckCardStats;
 
 function toPublicDeck(deck: Deck): PublicDeck {
   return {
@@ -34,10 +36,40 @@ function toPublicDeck(deck: Deck): PublicDeck {
   };
 }
 
+interface StatCriteria {
+  dueCount: Prisma.CardWhereInput;
+  newCount: Prisma.CardWhereInput;
+  learningCount: Prisma.CardWhereInput;
+  matureCount: Prisma.CardWhereInput;
+  suspendedCount: Prisma.CardWhereInput;
+}
+
+/**
+ * `where` de cada contagem por status — mesma prioridade de
+ * `deriveCardStatus`/`statusWhereClause` em `card.service.ts`, mas aqui
+ * repetida porque as duas contagens de baralho (lista e detalhe) rodam
+ * `groupBy`/`count` em paralelo, não sobre um card já carregado.
+ */
+function statCriteria(now: Date): StatCriteria {
+  return {
+    // Mesmo critério de "pronto para revisão" da fila (`review.service.ts`).
+    dueCount: { suspended: false, OR: [{ state: 'new' }, { dueAt: { lte: now } }] },
+    newCount: { suspended: false, state: 'new' },
+    learningCount: { suspended: false, state: 'learning' },
+    matureCount: {
+      suspended: false,
+      state: 'review',
+      lastGrade: { not: 'hard' },
+      intervalDays: { gte: MATURE_INTERVAL_DAYS },
+    },
+    suspendedCount: { suspended: true },
+  };
+}
+
 /** Conta, por baralho, os cards que casam com `where` — uma consulta agregada, não uma por baralho. */
 async function countCardsByDeck(
   userId: string,
-  where: Record<string, unknown>,
+  where: Prisma.CardWhereInput,
 ): Promise<Map<string, number>> {
   const groups = await prisma.card.groupBy({
     by: ['deckId'],
@@ -49,15 +81,18 @@ async function countCardsByDeck(
 }
 
 export async function listDecksByUser(userId: string): Promise<PublicDeckWithStats[]> {
-  const now = new Date();
+  const criteria = statCriteria(new Date());
 
-  const [decks, cardCounts, dueCounts, matureCounts] = await Promise.all([
-    prisma.deck.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-    countCardsByDeck(userId, {}),
-    // Mesmo critério de "pronto para revisão" da fila (`review.service.ts`).
-    countCardsByDeck(userId, { OR: [{ state: 'new' }, { dueAt: { lte: now } }] }),
-    countCardsByDeck(userId, { state: 'review', intervalDays: { gte: MATURE_INTERVAL_DAYS } }),
-  ]);
+  const [decks, cardCounts, dueCounts, newCounts, learningCounts, matureCounts, suspendedCounts] =
+    await Promise.all([
+      prisma.deck.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+      countCardsByDeck(userId, {}),
+      countCardsByDeck(userId, criteria.dueCount),
+      countCardsByDeck(userId, criteria.newCount),
+      countCardsByDeck(userId, criteria.learningCount),
+      countCardsByDeck(userId, criteria.matureCount),
+      countCardsByDeck(userId, criteria.suspendedCount),
+    ]);
 
   // Um baralho sem card algum não gera linha num `groupBy` — ausente do
   // mapa é o mesmo que zero, não "desconhecido".
@@ -65,7 +100,10 @@ export async function listDecksByUser(userId: string): Promise<PublicDeckWithSta
     ...toPublicDeck(deck),
     cardCount: cardCounts.get(deck.id) ?? 0,
     dueCount: dueCounts.get(deck.id) ?? 0,
+    newCount: newCounts.get(deck.id) ?? 0,
+    learningCount: learningCounts.get(deck.id) ?? 0,
     matureCount: matureCounts.get(deck.id) ?? 0,
+    suspendedCount: suspendedCounts.get(deck.id) ?? 0,
   }));
 }
 
@@ -102,9 +140,27 @@ async function findDeckOrThrow(id: string, userId: string): Promise<Deck> {
 
 export async function getDeckForUser(id: string, userId: string): Promise<PublicDeckWithCardCount> {
   const deck = await findDeckOrThrow(id, userId);
-  const cardCount = await prisma.card.count({ where: { deckId: deck.id } });
+  const criteria = statCriteria(new Date());
 
-  return { ...toPublicDeck(deck), cardCount };
+  const [cardCount, dueCount, newCount, learningCount, matureCount, suspendedCount] =
+    await Promise.all([
+      prisma.card.count({ where: { deckId: deck.id } }),
+      prisma.card.count({ where: { deckId: deck.id, ...criteria.dueCount } }),
+      prisma.card.count({ where: { deckId: deck.id, ...criteria.newCount } }),
+      prisma.card.count({ where: { deckId: deck.id, ...criteria.learningCount } }),
+      prisma.card.count({ where: { deckId: deck.id, ...criteria.matureCount } }),
+      prisma.card.count({ where: { deckId: deck.id, ...criteria.suspendedCount } }),
+    ]);
+
+  return {
+    ...toPublicDeck(deck),
+    cardCount,
+    dueCount,
+    newCount,
+    learningCount,
+    matureCount,
+    suspendedCount,
+  };
 }
 
 export async function updateDeck(

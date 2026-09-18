@@ -58,11 +58,18 @@ export const cardIdParamSchema = z.object({
   params: z.object({ id: z.uuid('Id de card inválido.') }),
 });
 
+const cardStatus = z.enum(
+  ['new', 'learning', 'difficult', 'mature', 'reviewing', 'suspended'],
+  'Status de card inválido.',
+);
+
 export const listCardsQuerySchema = z.object({
   params: z.object({ id: z.uuid('Id de baralho inválido.') }),
   query: z.object({
     page: z.coerce.number().int().min(1).optional().default(1),
     pageSize: z.coerce.number().int().min(1).max(200).optional().default(50),
+    q: z.string().trim().min(1).optional(),
+    status: cardStatus.optional(),
   }),
 });
 
