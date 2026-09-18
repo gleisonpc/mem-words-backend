@@ -18,6 +18,11 @@ model User {
   email        String   @unique @db.VarChar(255)
   // Hash bcrypt — a senha em texto puro nunca é persistida.
   passwordHash String   @map("password_hash")
+  // Sequência de dias seguidos com ao menos uma nota de revisão
+  // registrada, e o dia (calendário UTC) da última — ver
+  // `src/lib/streak.ts` e o change `add-home-dashboard-summary`.
+  currentStreak Int       @default(0) @map("current_streak")
+  lastActiveOn  DateTime? @map("last_active_on") @db.Date
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

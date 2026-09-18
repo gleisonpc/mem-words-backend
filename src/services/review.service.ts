@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import { computeNextSchedule, type ReviewGrade } from '../lib/scheduling.js';
 import { ensureDeckOwnership, findCardOrThrow, toPublicCard, type PublicCard } from './card.service.js';
+import { registerReviewActivity } from './user.service.js';
 
 const GRADES: ReviewGrade[] = ['again', 'hard', 'good', 'easy'];
 
@@ -48,7 +49,9 @@ export async function getReviewQueue(deckId: string, userId: string): Promise<Qu
 
 /**
  * Registra uma nota de revisão para um card, recalculando seu agendamento
- * com `computeNextSchedule` e persistindo o resultado.
+ * com `computeNextSchedule` e persistindo o resultado. Também conta como
+ * atividade do dia para a sequência de dias seguidos do dono do baralho,
+ * qualquer que seja a nota.
  */
 export async function recordReview(
   id: string,
@@ -56,7 +59,8 @@ export async function recordReview(
   grade: ReviewGrade,
 ): Promise<PublicCard> {
   const card = await findCardOrThrow(id, userId);
-  const schedule = computeNextSchedule(card, grade, new Date());
+  const now = new Date();
+  const schedule = computeNextSchedule(card, grade, now);
 
   const updated = await prisma.card.update({
     where: { id },
@@ -70,5 +74,35 @@ export async function recordReview(
     },
   });
 
+  await registerReviewActivity(userId, now);
+
   return toPublicCard(updated);
+}
+
+export interface TodaySummary {
+  dueCount: number;
+  newCount: number;
+  learningCount: number;
+  reviewCount: number;
+}
+
+/**
+ * Agrega, entre todos os baralhos do usuário, os cards prontos para
+ * revisão agora — mesmo critério de `getReviewQueue`, dividido por tipo em
+ * vez de por baralho.
+ */
+export async function getTodaySummary(userId: string): Promise<TodaySummary> {
+  const now = new Date();
+
+  const [newCount, learningCount, reviewCount] = await Promise.all([
+    prisma.card.count({ where: { deck: { userId }, suspended: false, state: 'new' } }),
+    prisma.card.count({
+      where: { deck: { userId }, suspended: false, state: 'learning', dueAt: { lte: now } },
+    }),
+    prisma.card.count({
+      where: { deck: { userId }, suspended: false, state: 'review', dueAt: { lte: now } },
+    }),
+  ]);
+
+  return { dueCount: newCount + learningCount + reviewCount, newCount, learningCount, reviewCount };
 }

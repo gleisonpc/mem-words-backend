@@ -1,6 +1,7 @@
 import type { User } from '../generated/prisma/client.js';
 import prisma from '../lib/prisma.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { nextStreak } from '../lib/streak.js';
 import { ConflictError, NotFoundError, UnauthorizedError } from '../errors/AppError.js';
 import type { CreateUserInput, UpdateUserInput } from '../schemas/user.schema.js';
 
@@ -9,6 +10,7 @@ export interface PublicUser {
   id: string;
   name: string;
   email: string;
+  currentStreak: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,9 +20,31 @@ export function toPublicUser(user: User): PublicUser {
     id: user.id,
     name: user.name,
     email: user.email,
+    currentStreak: user.currentStreak,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+}
+
+/**
+ * Registra que o usuário teve atividade de revisão agora, recalculando sua
+ * sequência de dias seguidos (`nextStreak`) e persistindo o resultado.
+ * Chamada a cada nota de revisão registrada (`review.service.recordReview`),
+ * qualquer que seja a nota.
+ */
+export async function registerReviewActivity(userId: string, now: Date): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (user === null) {
+    return;
+  }
+
+  const streak = nextStreak(user.currentStreak, user.lastActiveOn, now);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { currentStreak: streak.currentStreak, lastActiveOn: streak.lastActiveOn },
+  });
 }
 
 export async function createUser(input: CreateUserInput): Promise<PublicUser> {

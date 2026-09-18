@@ -25,3 +25,13 @@ export const create: RequestHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+/** GET /reviews/today */
+export const today: RequestHandler = async (req, res, next) => {
+  try {
+    const user = requireUser(req);
+    res.status(200).json({ today: await reviewService.getTodaySummary(user.id) });
+  } catch (error) {
+    next(error);
+  }
+};
