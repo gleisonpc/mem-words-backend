@@ -14,6 +14,10 @@ revisão agora: todo card em `new` (ainda não estudado), e todo card em
 `learning` ou `review` cujo `dueAt` já tenha passado. Cards em `review` ou
 `learning` cujo `dueAt` ainda não chegou SHALL NOT aparecer na fila.
 
+Card suspenso SHALL NOT aparecer na fila, qualquer que seja seu `state`
+ou `dueAt` — suspender é a forma do usuário tirar um card da revisão até
+decidir reativá-lo.
+
 Cada card da fila SHALL vir acompanhado da prévia do intervalo resultante
 de cada uma das quatro notas possíveis (`again`, `hard`, `good`, `easy`),
 calculada a partir do estado atual do card, para que a tela de revisão
@@ -40,6 +44,12 @@ A fila SHALL ser ordenada com `learning` primeiro, depois `review`, depois
   `GET /decks/:id/reviews/queue`
 - **THEN** o sistema responde `200` com uma lista vazia
 
+#### Scenario: Card suspenso não aparece na fila
+- **WHEN** um baralho tem um card suspenso que seria elegível pela regra
+  de `state`/`dueAt` (por exemplo, `new`, ou vencido)
+- **THEN** esse card NÃO aparece na resposta de
+  `GET /decks/:id/reviews/queue`
+
 #### Scenario: Usuário tenta ver a fila de baralho de outra conta
 - **WHEN** um usuário autenticado envia `GET /decks/:id/reviews/queue` para
   um baralho que pertence a outro usuário
@@ -64,21 +74,30 @@ algoritmo de repetição espaçada:
   partir do fator de facilidade — `hard` reduz o fator de facilidade,
   `good` o mantém, `easy` o aumenta — respeitando um intervalo máximo fixo.
 
+Toda nota registrada SHALL também ser persistida como `lastGrade` do
+card, substituindo a nota anterior — usada para classificar o card como
+`difficult` quando a mais recente for `hard` (ver capability `cards`).
+
 Nenhuma nota SHALL exigir ou aceitar dados além da nota em si — o
 agendamento resultante é sempre determinado pelo estado atual do card e
 pela nota recebida, nunca por um valor de intervalo informado pelo cliente.
+
+Registrar uma nota em um card suspenso SHALL ser aceito normalmente — a
+suspensão só afeta se o card aparece na fila, não a possibilidade de
+revisá-lo diretamente pelo `id`.
 
 #### Scenario: Card novo recebe a primeira nota
 - **WHEN** o dono do baralho envia `POST /cards/:id/reviews` com `grade:
   "good"` para um card em `new`
 - **THEN** o sistema responde `200` com o card em `learning`, no primeiro
-  passo de aprendizado avançado, e `dueAt` correspondente
+  passo de aprendizado avançado, `dueAt` correspondente, e `lastGrade:
+  "good"`
 
 #### Scenario: Card em aprendizado erra a resposta
 - **WHEN** o dono do baralho envia `POST /cards/:id/reviews` com `grade:
   "again"` para um card em `learning`
 - **THEN** o sistema responde `200` com o card de volta ao primeiro passo de
-  aprendizado
+  aprendizado, e `lastGrade: "again"`
 
 #### Scenario: Card em aprendizado gradua para revisão
 - **WHEN** o dono do baralho envia `POST /cards/:id/reviews` com `grade:
@@ -98,6 +117,14 @@ pela nota recebida, nunca por um valor de intervalo informado pelo cliente.
 - **THEN** o sistema responde `200` com o card ainda em `review`, fator de
   facilidade maior e um intervalo maior que o anterior, sem ultrapassar o
   intervalo máximo
+
+#### Scenario: Nota "hard" marca o card como difícil
+- **WHEN** o dono do baralho envia `POST /cards/:id/reviews` com `grade:
+  "hard"` para um card em `review`
+- **THEN** o sistema responde `200` com `lastGrade: "hard"`
+- **AND** o `status` calculado do card (ver capability `cards`) é
+  `difficult`, mesmo que seu `intervalDays` já atenda ao limiar de
+  maturidade
 
 #### Scenario: Nota inválida
 - **WHEN** um usuário envia `POST /cards/:id/reviews` com um valor de
