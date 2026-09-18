@@ -71,6 +71,7 @@ Exigem o header `Authorization: Bearer <accessToken>`.
 | `DELETE` | `/cards/:id` | Exclui um card → `204` |
 | `GET` | `/decks/:id/reviews/queue` | Cards prontos para revisão agora, cada um com a prévia das 4 notas |
 | `POST` | `/cards/:id/reviews` | Registra uma nota (`again`/`hard`/`good`/`easy`) → card atualizado |
+| `GET` | `/reviews/today` | Agregado entre baralhos dos cards prontos agora, por tipo (`newCount`/`learningCount`/`reviewCount`/`dueCount`) |
 
 `PATCH` e `DELETE` só funcionam sobre a **própria** conta: usar o id de outro
 usuário devolve `403`, mesmo com um token válido. O mesmo vale para
