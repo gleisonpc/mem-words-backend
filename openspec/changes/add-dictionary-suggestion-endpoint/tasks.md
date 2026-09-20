@@ -31,3 +31,14 @@
 - [x] 5.3 Renomear a implementação Datamuse existente para `fetchSynonymsByRelation`; `fetchSynonyms` agora roda as duas em paralelo (`Promise.allSettled`) e prefere o resultado por sentido quando disponível
 - [x] 5.4 Rodar `npm run typecheck` e confirmar que passa sem erros
 - [x] 5.5 Verificado que a lógica de seleção está correta contra uma resposta real do Free Dictionary API para "fast" (`quick, rapid, speedy`) — o Free Dictionary API se mostrou instável neste ambiente de desenvolvimento (`522` intermitente, em ambos os caminhos de rede testados), então a maioria das tentativas nesta sessão caiu de volta para o Datamuse; a instabilidade em si não é um defeito desta correção — é o motivo de a segunda fonte existir, e só a observação em produção (IP do Render, diferente dos testados aqui) vai dizer com que frequência a fonte melhor está disponível
+
+## 6. Correção pós-lançamento: tradução da frase de exemplo e classe gramatical
+
+- [x] 6.1 Reproduzido o problema relatado: a sugestão nunca preenchia "Tradução da frase" nem "Classe gramatical" na tela de criação de card — só existiam campos para tradução da palavra, frase em inglês e sinônimos
+- [x] 6.2 Extrair `translateText(text, target)` de `fetchTranslation`, reutilizável para palavra ou frase inteira; `fetchTranslation` passa a chamá-la e manter só a checagem de "tradução igual ao original"
+- [x] 6.3 Renomear `fetchExampleSentence` para `fetchWiktionaryExample`, devolvendo também `partOfSpeech` (da mesma entrada de onde a frase saiu, mapeado para português)
+- [x] 6.4 Extrair `fetchFreeDictionaryEntry` (busca única ao Free Dictionary API, compartilhada por `pickBestMeaningSynonyms` — a antiga `fetchSynonymsBySense` — e pela nova `pickFallbackExample`, que usa a mesma resposta como frase de exemplo alternativa quando a Wiktionary não tem nenhuma)
+- [x] 6.5 Em `fetchSuggestion`, buscar a tradução da frase (`translateText(exampleInfo.example, pair.target)`) depois de resolvida a frase de exemplo (Wiktionary ou o fallback) — as demais chamadas continuam saindo juntas em paralelo
+- [x] 6.6 Atualizar `DictionarySuggestion` com `exampleTranslation` e `partOfSpeech`, e a spec delta (`specs/dictionary/spec.md`) com os novos campos e cenários
+- [x] 6.7 Rodar `npm run typecheck` e `npm run build` e confirmar que passam sem erros
+- [x] 6.8 Testado manualmente (backend local, Postgres real): "fast", "overwhelm", "gratitude" e "happy" devolveram `exampleTranslation` e `partOfSpeech` reais e coerentes com a frase mostrada; par não reconhecido continua `suggestion: null`; sem token continua `401`

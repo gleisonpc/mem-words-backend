@@ -18,6 +18,8 @@ export interface LanguagePair {
 export interface DictionarySuggestion {
   translation?: string;
   exampleSentence?: string;
+  exampleTranslation?: string;
+  partOfSpeech?: string;
   synonyms?: string[];
 }
 
@@ -104,6 +106,34 @@ function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, '').trim();
 }
 
+/**
+ * Classe gramatical em português, a partir do valor em inglês que
+ * Wiktionary e o Free Dictionary API expõem ("noun", "verb", "Adjective"...).
+ * Um valor não mapeado passa direto — melhor mostrar o termo em inglês do
+ * que descartar a informação.
+ */
+const PART_OF_SPEECH_PT: Record<string, string> = {
+  noun: 'substantivo',
+  verb: 'verbo',
+  adjective: 'adjetivo',
+  adverb: 'advérbio',
+  pronoun: 'pronome',
+  preposition: 'preposição',
+  conjunction: 'conjunção',
+  interjection: 'interjeição',
+  determiner: 'artigo',
+  article: 'artigo',
+  numeral: 'numeral',
+};
+
+function normalizePartOfSpeech(partOfSpeech: string | undefined): string | undefined {
+  if (!partOfSpeech) {
+    return undefined;
+  }
+
+  return PART_OF_SPEECH_PT[normalize(partOfSpeech)] ?? partOfSpeech;
+}
+
 /** Uma chamada isolada: nunca lança — falha, tempo esgotado ou corpo que não é JSON viram `null`. */
 async function fetchJson(url: string): Promise<unknown> {
   const controller = new AbortController();
@@ -124,8 +154,17 @@ async function fetchJson(url: string): Promise<unknown> {
   }
 }
 
-/** Frase de exemplo em inglês, da Wiktionary — a primeira encontrada entre as definições da palavra. */
-async function fetchExampleSentence(word: string): Promise<string | null> {
+interface ExampleInfo {
+  example: string;
+  partOfSpeech?: string | undefined;
+}
+
+/**
+ * Frase de exemplo em inglês, da Wiktionary — a primeira encontrada entre as
+ * definições da palavra, com a classe gramatical daquela mesma entrada (para
+ * que os dois sempre descrevam a mesma acepção).
+ */
+async function fetchWiktionaryExample(word: string): Promise<ExampleInfo | null> {
   const data = (await fetchJson(
     `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`,
   )) as { en?: unknown } | null;
@@ -136,7 +175,7 @@ async function fetchExampleSentence(word: string): Promise<string | null> {
     return null;
   }
 
-  for (const entry of entries as Array<{ definitions?: unknown }>) {
+  for (const entry of entries as Array<{ partOfSpeech?: string; definitions?: unknown }>) {
     for (const definition of (entry.definitions ?? []) as Array<{
       parsedExamples?: unknown;
       examples?: unknown;
@@ -150,7 +189,7 @@ async function fetchExampleSentence(word: string): Promise<string | null> {
           typeof example === 'string' ? example : ((example as { example?: string })?.example ?? null);
 
         if (text) {
-          return stripTags(text);
+          return { example: stripTags(text), partOfSpeech: normalizePartOfSpeech(entry.partOfSpeech) };
         }
       }
     }
@@ -159,27 +198,44 @@ async function fetchExampleSentence(word: string): Promise<string | null> {
   return null;
 }
 
+interface FreeDictionaryEntry {
+  meanings?: Array<{
+    partOfSpeech?: string;
+    synonyms?: string[];
+    definitions?: Array<{ example?: string }>;
+  }>;
+}
+
 /**
- * Sinônimos agrupados por classe gramatical, do Free Dictionary API — cada
- * classe (substantivo, verbo, adjetivo...) traz só os sinônimos das suas
- * próprias acepções, então já chega bem menos misturado entre sentidos
- * diferentes da palavra do que uma busca por similaridade pura (ver
- * `fetchSynonymsByRelation`, abaixo). Usa a classe gramatical com mais
- * sinônimos listados — proxy para "a acepção mais documentada da palavra",
- * o que evita pegar a classe gramatical rara (ex.: o substantivo "fast" —
- * o trem expresso — quando a palavra é bem mais comum como adjetivo).
+ * Busca única no Free Dictionary API, compartilhada por
+ * `pickBestMeaningSynonyms` (sinônimos por classe gramatical) e
+ * `pickFallbackExample` (frase de exemplo, quando a Wiktionary não tem
+ * nenhuma) — as duas derivam da mesma resposta, sem repetir a chamada.
  *
- * Esta API terceira é instável (observado nesta sessão: `522` recorrente
- * para algumas palavras específicas, `200` normal para outras) e nem toda
- * palavra tem sinônimos documentados em nenhuma classe gramatical — por
- * isso é tentada em paralelo com `fetchSynonymsByRelation`, nunca sozinha.
+ * Esta API terceira é instável (observado em sessão de desenvolvimento:
+ * `522` recorrente para algumas palavras específicas, `200` normal para
+ * outras) — por isso nunca é a única fonte de nada.
  */
-async function fetchSynonymsBySense(word: string): Promise<string[] | null> {
+async function fetchFreeDictionaryEntry(word: string): Promise<FreeDictionaryEntry | null> {
   const data = (await fetchJson(
     `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
-  )) as Array<{ meanings?: Array<{ synonyms?: string[] }> }> | null;
+  )) as FreeDictionaryEntry[] | null;
 
-  const meanings = data?.[0]?.meanings;
+  return Array.isArray(data) ? (data[0] ?? null) : null;
+}
+
+/**
+ * Sinônimos agrupados por classe gramatical — cada classe (substantivo,
+ * verbo, adjetivo...) traz só os sinônimos das próprias acepções, então já
+ * chega bem menos misturado entre sentidos diferentes da palavra do que uma
+ * busca por similaridade pura (ver `fetchSynonymsByRelation`, abaixo). Usa a
+ * classe gramatical com mais sinônimos listados — proxy para "a acepção mais
+ * documentada da palavra", o que evita pegar a classe gramatical rara (ex.:
+ * o substantivo "fast" — o trem expresso — quando a palavra é bem mais
+ * comum como adjetivo).
+ */
+function pickBestMeaningSynonyms(entry: FreeDictionaryEntry | null): string[] | null {
+  const meanings = entry?.meanings;
 
   if (!Array.isArray(meanings)) {
     return null;
@@ -201,9 +257,28 @@ async function fetchSynonymsBySense(word: string): Promise<string[] | null> {
   return best.length >= 2 ? best.slice(0, 3) : null;
 }
 
+/** Frase de exemplo alternativa, para quando a Wiktionary não tem nenhuma. */
+function pickFallbackExample(entry: FreeDictionaryEntry | null): ExampleInfo | null {
+  const meanings = entry?.meanings;
+
+  if (!Array.isArray(meanings)) {
+    return null;
+  }
+
+  for (const meaning of meanings) {
+    for (const definition of meaning.definitions ?? []) {
+      if (definition.example) {
+        return { example: definition.example, partOfSpeech: normalizePartOfSpeech(meaning.partOfSpeech) };
+      }
+    }
+  }
+
+  return null;
+}
+
 /** Sinônimos por similaridade de sentido, do Datamuse — não distingue classe
  * gramatical nem acepção, então mistura sentidos diferentes da mesma palavra
- * com alguma frequência (ver `fetchSynonymsBySense`, preferida quando
+ * com alguma frequência (ver `pickBestMeaningSynonyms`, preferida quando
  * disponível). No máximo 3, os mais relevantes. */
 async function fetchSynonymsByRelation(word: string): Promise<string[] | null> {
   const data = (await fetchJson(
@@ -219,25 +294,9 @@ async function fetchSynonymsByRelation(word: string): Promise<string[] | null> {
   return synonyms.length > 0 ? synonyms : null;
 }
 
-/** Sinônimos da palavra: tenta as duas fontes em paralelo, preferindo a
- * separada por classe gramatical (mais precisa) quando ela tem algo. */
-async function fetchSynonyms(word: string): Promise<string[] | null> {
-  const [bySense, byRelation] = await Promise.allSettled([
-    fetchSynonymsBySense(word),
-    fetchSynonymsByRelation(word),
-  ]);
-
-  const bySenseValue = bySense.status === 'fulfilled' ? bySense.value : null;
-
-  if (bySenseValue) {
-    return bySenseValue;
-  }
-
-  return byRelation.status === 'fulfilled' ? byRelation.value : null;
-}
-
 /**
- * Tradução da palavra, do endpoint não-oficial do Google Tradutor.
+ * Traduz um texto (palavra ou frase) do inglês, pelo endpoint não-oficial do
+ * Google Tradutor.
  *
  * Trocado de lugar da MyMemory (change `improve-dictionary-suggestion-quality`):
  * a cota gratuita da MyMemory é por IP, e o IP de saída de um serviço
@@ -249,9 +308,9 @@ async function fetchSynonyms(word: string): Promise<string[] | null> {
  * então uma eventual instabilidade aqui degrada como qualquer outro serviço
  * desta lista, nunca como erro.
  */
-async function fetchTranslation(word: string, target: string): Promise<string | null> {
+async function translateText(text: string, target: string): Promise<string | null> {
   const data = await fetchJson(
-    `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${target}&dt=t&q=${encodeURIComponent(word)}`,
+    `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${target}&dt=t&q=${encodeURIComponent(text)}`,
   );
 
   const segments = Array.isArray(data) ? (data[0] as unknown) : null;
@@ -262,9 +321,16 @@ async function fetchTranslation(word: string, target: string): Promise<string | 
 
   const translation = segments
     .map((segment) => (Array.isArray(segment) ? (segment[0] as unknown) : null))
-    .filter((text): text is string => typeof text === 'string')
+    .filter((value): value is string => typeof value === 'string')
     .join('')
     .trim();
+
+  return translation || null;
+}
+
+/** Tradução da palavra — descartada quando a "tradução" devolvida é a própria palavra. */
+async function fetchTranslation(word: string, target: string): Promise<string | null> {
+  const translation = await translateText(word, target);
 
   if (!translation || translation.toLowerCase() === word.trim().toLowerCase()) {
     return null;
@@ -280,13 +346,15 @@ export interface FetchSuggestionInput {
 }
 
 /**
- * Busca sugestão de tradução, frase de exemplo e sinônimos para `word`.
+ * Busca sugestão de tradução, frase de exemplo (com sua tradução) e
+ * sinônimos para `word`.
  *
  * Nunca lança: cada serviço que falhar, expirar ou não trazer nada
- * aproveitável simplesmente não contribui — as três chamadas saem em
- * paralelo e a falta de uma não impede as outras. Devolve `null` quando o
- * par de idiomas não é reconhecido, a palavra está vazia, ou nenhum dos
- * três serviços trouxe algo.
+ * aproveitável simplesmente não contribui. A tradução da frase de exemplo
+ * depende de já ter uma frase (da Wiktionary ou do Free Dictionary API), por
+ * isso sai depois da primeira leva de chamadas — todo o resto sai em
+ * paralelo. Devolve `null` quando o par de idiomas não é reconhecido, a
+ * palavra está vazia, ou nada de nenhum serviço veio.
  */
 export async function fetchSuggestion({
   word,
@@ -300,23 +368,36 @@ export async function fetchSuggestion({
     return null;
   }
 
-  const [exampleResult, synonymsResult, translationResult] = await Promise.allSettled([
-    fetchExampleSentence(trimmedWord),
-    fetchSynonyms(trimmedWord),
-    fetchTranslation(trimmedWord, pair.target),
-  ]);
+  const [wiktionaryResult, freeDictResult, synonymsByRelationResult, translationResult] =
+    await Promise.allSettled([
+      fetchWiktionaryExample(trimmedWord),
+      fetchFreeDictionaryEntry(trimmedWord),
+      fetchSynonymsByRelation(trimmedWord),
+      fetchTranslation(trimmedWord, pair.target),
+    ]);
 
-  const exampleSentence = exampleResult.status === 'fulfilled' ? exampleResult.value : null;
-  const synonyms = synonymsResult.status === 'fulfilled' ? synonymsResult.value : null;
+  const wiktionaryExample = wiktionaryResult.status === 'fulfilled' ? wiktionaryResult.value : null;
+  const freeDictEntry = freeDictResult.status === 'fulfilled' ? freeDictResult.value : null;
+  const synonymsByRelation =
+    synonymsByRelationResult.status === 'fulfilled' ? synonymsByRelationResult.value : null;
   const translation = translationResult.status === 'fulfilled' ? translationResult.value : null;
 
-  if (!exampleSentence && !synonyms && !translation) {
+  const exampleInfo = wiktionaryExample ?? pickFallbackExample(freeDictEntry);
+  const synonyms = pickBestMeaningSynonyms(freeDictEntry) ?? synonymsByRelation;
+
+  const exampleTranslation = exampleInfo
+    ? await translateText(exampleInfo.example, pair.target)
+    : null;
+
+  if (!exampleInfo && !synonyms && !translation) {
     return null;
   }
 
   return {
     ...(translation && { translation }),
-    ...(exampleSentence && { exampleSentence }),
+    ...(exampleInfo?.example && { exampleSentence: exampleInfo.example }),
+    ...(exampleTranslation && { exampleTranslation }),
+    ...(exampleInfo?.partOfSpeech && { partOfSpeech: exampleInfo.partOfSpeech }),
     ...(synonyms && { synonyms }),
   };
 }
