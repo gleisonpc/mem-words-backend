@@ -16,3 +16,10 @@
 - [x] 3.2 Testado manualmente (backend local, Postgres real, `curl` com um access token real) `GET /dictionary/suggest?word=overwhelm&sourceLanguage=Ingl%C3%AAs&targetLanguage=Portugu%C3%AAs` — devolveu tradução, frase de exemplo e sinônimos reais
 - [x] 3.3 Testado com o par invertido (`sourceLanguage=Portugues&targetLanguage=ingles`, o par real do baralho que motivou o bugfix no frontend) — mesma sugestão; e com um par não reconhecido (Klingon) — `suggestion: null`
 - [x] 3.4 Testado sem `Authorization` — `401 UNAUTHORIZED`; e sem `sourceLanguage`/`targetLanguage` — `400 BAD_REQUEST` com os dois campos listados em `details`
+
+## 4. Correção pós-merge: qualidade da sugestão (change `improve-dictionary-suggestion-quality`)
+
+- [x] 4.1 Reduzir `max=8` para `max=3` em `fetchSynonyms` (Datamuse) — três sinônimos bastam para o card
+- [x] 4.2 Trocar `fetchTranslation` de MyMemory (cota por IP, quase sempre esgotada em produção — confirmado nesta sessão) para o endpoint não-oficial do Google Tradutor (`translate.googleapis.com/translate_a/single`), parseando `data[0]` (array de segmentos `[traduzido, original, ...]`) e concatenando os textos traduzidos
+- [x] 4.3 Rodar `npm run typecheck` e confirmar que passa sem erros
+- [x] 4.4 Testado manualmente (backend local, Postgres real) `GET /dictionary/suggest` para "overwhelm" (Inglês→Português, e o par invertido Português→Inglês), "gratitude" (Inglês→Espanhol) e um par não reconhecido — tradução real do Google Tradutor em todos os casos aplicáveis, no máximo 3 sinônimos, e `suggestion: null` sem chamada externa para o par não reconhecido
