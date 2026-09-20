@@ -139,3 +139,27 @@ rodando no servidor.
   vai responder — por isso ela nunca é a única fonte: falhando, a busca
   por similaridade (Datamuse) já em uso continua funcionando exatamente
   como antes desta correção.
+
+### Tradução da frase de exemplo e classe gramatical (correção pós-lançamento)
+
+A tela de criação de card sempre teve os campos "Tradução da frase" e
+"Classe gramatical", mas a sugestão nunca os preenchia — só a tradução da
+palavra, a frase em inglês e sinônimos. Corrigido reaproveitando
+`translateText` (a mesma função usada para a palavra, generalizada para
+aceitar frase inteira) para também traduzir `exampleSentence`, e
+carregando `partOfSpeech` de junto da mesma acepção de onde a frase saiu —
+da Wiktionary quando ela tem exemplo para a palavra, ou do Free Dictionary
+API quando não tem (a mesma resposta já buscada para sinônimos por
+classe gramatical, sem chamada extra).
+
+A tradução da frase só começa depois que uma frase é encontrada — as duas
+não podem sair em paralelo, já que uma depende do resultado da outra.
+Tudo o mais (frase, sinônimos, tradução da palavra) continua saindo junto,
+então o custo em tempo dessa dependência é só o de uma chamada extra
+(até 4s no pior caso), não de duas chamadas inteiras em série.
+
+Alternativa descartada: pedir ao Google Tradutor a frase e a palavra numa
+única chamada. Rejeitada porque a palavra pode não fazer parte da frase de
+exemplo do jeito esperado (conjugação, forma plural), e separar as duas
+chamadas mantém `translateText` simples — a mesma função serve os dois
+casos sem nenhuma lógica de recorte de texto.
