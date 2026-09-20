@@ -159,8 +159,53 @@ async function fetchExampleSentence(word: string): Promise<string | null> {
   return null;
 }
 
-/** Sinônimos por similaridade de sentido, do Datamuse — no máximo 3, os mais relevantes. */
-async function fetchSynonyms(word: string): Promise<string[] | null> {
+/**
+ * Sinônimos agrupados por classe gramatical, do Free Dictionary API — cada
+ * classe (substantivo, verbo, adjetivo...) traz só os sinônimos das suas
+ * próprias acepções, então já chega bem menos misturado entre sentidos
+ * diferentes da palavra do que uma busca por similaridade pura (ver
+ * `fetchSynonymsByRelation`, abaixo). Usa a classe gramatical com mais
+ * sinônimos listados — proxy para "a acepção mais documentada da palavra",
+ * o que evita pegar a classe gramatical rara (ex.: o substantivo "fast" —
+ * o trem expresso — quando a palavra é bem mais comum como adjetivo).
+ *
+ * Esta API terceira é instável (observado nesta sessão: `522` recorrente
+ * para algumas palavras específicas, `200` normal para outras) e nem toda
+ * palavra tem sinônimos documentados em nenhuma classe gramatical — por
+ * isso é tentada em paralelo com `fetchSynonymsByRelation`, nunca sozinha.
+ */
+async function fetchSynonymsBySense(word: string): Promise<string[] | null> {
+  const data = (await fetchJson(
+    `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
+  )) as Array<{ meanings?: Array<{ synonyms?: string[] }> }> | null;
+
+  const meanings = data?.[0]?.meanings;
+
+  if (!Array.isArray(meanings)) {
+    return null;
+  }
+
+  let best: string[] = [];
+
+  for (const meaning of meanings) {
+    const synonyms = meaning.synonyms ?? [];
+
+    if (synonyms.length > best.length) {
+      best = synonyms;
+    }
+  }
+
+  // Menos de dois sinônimos não é sinal forte o bastante de que esta classe
+  // gramatical é mesmo a acepção documentada da palavra — melhor deixar a
+  // busca por similaridade (mais ampla, ainda que menos precisa) decidir.
+  return best.length >= 2 ? best.slice(0, 3) : null;
+}
+
+/** Sinônimos por similaridade de sentido, do Datamuse — não distingue classe
+ * gramatical nem acepção, então mistura sentidos diferentes da mesma palavra
+ * com alguma frequência (ver `fetchSynonymsBySense`, preferida quando
+ * disponível). No máximo 3, os mais relevantes. */
+async function fetchSynonymsByRelation(word: string): Promise<string[] | null> {
   const data = (await fetchJson(
     `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=3`,
   )) as Array<{ word?: string }> | null;
@@ -172,6 +217,23 @@ async function fetchSynonyms(word: string): Promise<string[] | null> {
   const synonyms = data.map((entry) => entry.word).filter((word): word is string => Boolean(word));
 
   return synonyms.length > 0 ? synonyms : null;
+}
+
+/** Sinônimos da palavra: tenta as duas fontes em paralelo, preferindo a
+ * separada por classe gramatical (mais precisa) quando ela tem algo. */
+async function fetchSynonyms(word: string): Promise<string[] | null> {
+  const [bySense, byRelation] = await Promise.allSettled([
+    fetchSynonymsBySense(word),
+    fetchSynonymsByRelation(word),
+  ]);
+
+  const bySenseValue = bySense.status === 'fulfilled' ? bySense.value : null;
+
+  if (bySenseValue) {
+    return bySenseValue;
+  }
+
+  return byRelation.status === 'fulfilled' ? byRelation.value : null;
 }
 
 /**

@@ -30,6 +30,22 @@ recebe) não muda.
 > tradução", não como erro). Datamuse também teve `max=8` reduzido para
 > `max=3` — três sinônimos bastam para o card e reduzem ruído.
 
+> **Correção pós-merge #2 (change `improve-synonym-quality`):** o Datamuse
+> (`rel_syn`) não distingue sentido — para uma palavra com sentidos muito
+> diferentes, ele mistura sinônimos de todos eles. Exemplo real: "fast"
+> devolvia `profligate`, `libertine`, `degenerate` (sinônimos do sentido
+> raro "de hábitos dissolutos"), quando o sentido óbvio e mais comum é
+> "rápido" (`quick`, `rapid`, `speedy`, `swift`). Corrigido acrescentando
+> `fetchSynonymsBySense` — usa o Free Dictionary API
+> (`api.dictionaryapi.dev`), que agrupa sinônimos por classe gramatical
+> (cada classe só lista sinônimos das próprias acepções); a classe com
+> mais sinônimos listados vira a fonte, sob a hipótese de que a acepção
+> mais documentada é a mais comum. As duas fontes saem em paralelo
+> (`Promise.allSettled`, mesmo padrão das outras chamadas desta lista); a
+> busca por sentido, quando tem ao menos 2 sinônimos, tem prioridade sobre
+> a busca por similaridade pura, que só entra quando a primeira não tem
+> nada aproveitável.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -109,3 +125,17 @@ rodando no servidor.
   instabilidade futura degrada como qualquer serviço desta lista — sem
   tradução, nunca em erro — mas vale reavaliar se o padrão de bloqueio se
   repetir em produção.
+- O Free Dictionary API (`api.dictionaryapi.dev`, usado pela correção em
+  `improve-synonym-quality` para sinônimos por classe gramatical) se
+  mostrou instável nos dois sentidos possíveis: às vezes `522` (origem
+  fora do ar) via `curl`, às vezes `522` via `fetch` do Node exatamente
+  quando `curl` respondia `200` no mesmo instante — os dois caminhos de
+  rede deste ambiente de desenvolvimento têm reputações de IP diferentes
+  perante o Cloudflare dessa API, e nenhum dos dois é o caminho que o
+  backend hospedado (Render) realmente usa em produção. A lógica de
+  seleção do sentido certo foi confirmada correta contra uma resposta real
+  bem-sucedida (`fast` → `quick, rapid, speedy`); o quanto essa API estará
+  no ar a partir do IP do Render é algo que só a observação em produção
+  vai responder — por isso ela nunca é a única fonte: falhando, a busca
+  por similaridade (Datamuse) já em uso continua funcionando exatamente
+  como antes desta correção.
