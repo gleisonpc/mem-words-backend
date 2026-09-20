@@ -18,6 +18,18 @@ Nenhum dos três exige chave de API hoje. Portar essa lógica para o backend
 TypeScript — o comportamento observável (o que a tela de criação de card
 recebe) não muda.
 
+> **Correção pós-merge (change `improve-dictionary-suggestion-quality`):**
+> a cota gratuita da MyMemory é por IP, e o IP de saída de um serviço
+> hospedado é compartilhado entre um número desconhecido de outros
+> clientes do mesmo provedor — a cota chegava esgotada quase sempre,
+> deixando a tradução ausente na maior parte das sugestões em produção.
+> Trocado pelo endpoint não-oficial do Google Tradutor
+> (`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl={target}&dt=t&q={word}`)
+> — sem chave, sem cota documentada, mas também sem suporte oficial (pode
+> mudar ou ser bloqueado sem aviso; `fetchJson` já trata isso como "sem
+> tradução", não como erro). Datamuse também teve `max=8` reduzido para
+> `max=3` — três sinônimos bastam para o card e reduzem ruído.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -88,3 +100,12 @@ rodando no servidor.
 - O backend hospedado (Render) precisa de saída HTTPS livre para os três
   domínios — nenhum motivo para não ter, mas é uma dependência de rede nova
   para esse processo, que antes só falava com o Neon/Postgres.
+- O endpoint de tradução (Google Tradutor não-oficial, desde a correção
+  acima) não é documentado nem suportado — pode passar a bloquear por
+  reputação de IP, do jeito que já bloqueou o IP de saída do proxy usado
+  para desenvolver este change (verificado nesta sessão: bloqueado por
+  `curl`, mas funcionando pelo `fetch` do Node do backend local, que sai por
+  um caminho de rede diferente). Sem chave nem SLA, uma eventual
+  instabilidade futura degrada como qualquer serviço desta lista — sem
+  tradução, nunca em erro — mas vale reavaliar se o padrão de bloqueio se
+  repetir em produção.

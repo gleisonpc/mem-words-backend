@@ -159,10 +159,10 @@ async function fetchExampleSentence(word: string): Promise<string | null> {
   return null;
 }
 
-/** Sinônimos por similaridade de sentido, do Datamuse. */
+/** Sinônimos por similaridade de sentido, do Datamuse — no máximo 3, os mais relevantes. */
 async function fetchSynonyms(word: string): Promise<string[] | null> {
   const data = (await fetchJson(
-    `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=8`,
+    `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=3`,
   )) as Array<{ word?: string }> | null;
 
   if (!Array.isArray(data) || data.length === 0) {
@@ -174,17 +174,35 @@ async function fetchSynonyms(word: string): Promise<string[] | null> {
   return synonyms.length > 0 ? synonyms : null;
 }
 
-/** Tradução da palavra, da MyMemory — descartada quando a "tradução" devolvida é a própria palavra. */
+/**
+ * Tradução da palavra, do endpoint não-oficial do Google Tradutor.
+ *
+ * Trocado de lugar da MyMemory (change `improve-dictionary-suggestion-quality`):
+ * a cota gratuita da MyMemory é por IP, e o IP de saída de um serviço
+ * hospedado (compartilhado entre vários outros clientes do mesmo provedor)
+ * esgota essa cota rápido demais para o recurso funcionar de verdade. Este
+ * endpoint não é documentado nem suportado oficialmente pelo Google — pode
+ * mudar ou bloquear sem aviso — mas `fetchJson` já trata qualquer resposta
+ * que não seja `200` (inclusive um `429` de bloqueio) como "sem tradução",
+ * então uma eventual instabilidade aqui degrada como qualquer outro serviço
+ * desta lista, nunca como erro.
+ */
 async function fetchTranslation(word: string, target: string): Promise<string | null> {
-  const data = (await fetchJson(
-    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|${target}`,
-  )) as { responseStatus?: number; responseData?: { translatedText?: string } } | null;
+  const data = await fetchJson(
+    `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${target}&dt=t&q=${encodeURIComponent(word)}`,
+  );
 
-  if (data?.responseStatus !== 200) {
+  const segments = Array.isArray(data) ? (data[0] as unknown) : null;
+
+  if (!Array.isArray(segments)) {
     return null;
   }
 
-  const translation = data.responseData?.translatedText?.trim();
+  const translation = segments
+    .map((segment) => (Array.isArray(segment) ? (segment[0] as unknown) : null))
+    .filter((text): text is string => typeof text === 'string')
+    .join('')
+    .trim();
 
   if (!translation || translation.toLowerCase() === word.trim().toLowerCase()) {
     return null;
