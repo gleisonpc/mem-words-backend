@@ -23,3 +23,11 @@
 - [x] 4.2 Trocar `fetchTranslation` de MyMemory (cota por IP, quase sempre esgotada em produção — confirmado nesta sessão) para o endpoint não-oficial do Google Tradutor (`translate.googleapis.com/translate_a/single`), parseando `data[0]` (array de segmentos `[traduzido, original, ...]`) e concatenando os textos traduzidos
 - [x] 4.3 Rodar `npm run typecheck` e confirmar que passa sem erros
 - [x] 4.4 Testado manualmente (backend local, Postgres real) `GET /dictionary/suggest` para "overwhelm" (Inglês→Português, e o par invertido Português→Inglês), "gratitude" (Inglês→Espanhol) e um par não reconhecido — tradução real do Google Tradutor em todos os casos aplicáveis, no máximo 3 sinônimos, e `suggestion: null` sem chamada externa para o par não reconhecido
+
+## 5. Correção pós-merge: sinônimos misturando sentidos diferentes da palavra (change `improve-synonym-quality`)
+
+- [x] 5.1 Reproduzido o problema relatado: "fast" devolvia `profligate`, `prompt`, `libertine` (sinônimos do sentido raro "de hábitos dissolutos" de "fast"), não do sentido comum "rápido"
+- [x] 5.2 Adicionar `fetchSynonymsBySense` em `dictionary.service.ts`: busca no Free Dictionary API (`api.dictionaryapi.dev/api/v2/entries/en/{word}`), agrupa por `meanings[].synonyms` (já vem por classe gramatical) e usa a classe com mais sinônimos listados, exigindo ao menos 2 para considerar válido
+- [x] 5.3 Renomear a implementação Datamuse existente para `fetchSynonymsByRelation`; `fetchSynonyms` agora roda as duas em paralelo (`Promise.allSettled`) e prefere o resultado por sentido quando disponível
+- [x] 5.4 Rodar `npm run typecheck` e confirmar que passa sem erros
+- [x] 5.5 Verificado que a lógica de seleção está correta contra uma resposta real do Free Dictionary API para "fast" (`quick, rapid, speedy`) — o Free Dictionary API se mostrou instável neste ambiente de desenvolvimento (`522` intermitente, em ambos os caminhos de rede testados), então a maioria das tentativas nesta sessão caiu de volta para o Datamuse; a instabilidade em si não é um defeito desta correção — é o motivo de a segunda fonte existir, e só a observação em produção (IP do Render, diferente dos testados aqui) vai dizer com que frequência a fonte melhor está disponível
