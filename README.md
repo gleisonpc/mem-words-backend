@@ -46,9 +46,12 @@ O servidor sobe em `http://localhost:3000` por padrão (configurável via `PORT`
 | `GET` | `/health` | Sinal de vida → `{ "status": "ok" }` (não consulta o banco) |
 | `GET` | `/health/ready` | Prontidão → `200` se o banco responde, `503` se não |
 | `POST` | `/auth/register` | Cria um usuário → `201` |
-| `POST` | `/auth/login` | Autentica → access + refresh token |
-| `POST` | `/auth/refresh` | Troca o refresh token por um novo par |
-| `POST` | `/auth/logout` | Revoga o refresh token → `204` |
+| `POST` | `/auth/login` | Autentica → access token no corpo, refresh token por cookie `HttpOnly` |
+| `POST` | `/auth/refresh` | Troca o refresh token (cookie) por um novo par |
+| `POST` | `/auth/logout` | Revoga o refresh token do cookie → `204` |
+| `POST` | `/auth/mobile/login` | Autentica → access **e** refresh token no corpo (cliente mobile, sem cookie) |
+| `POST` | `/auth/mobile/refresh` | Troca o refresh token do corpo por um novo par, também no corpo |
+| `POST` | `/auth/mobile/logout` | Revoga o refresh token informado no corpo → `204` |
 
 ### Autenticados
 
@@ -102,6 +105,12 @@ curl -X POST http://localhost:3000/auth/refresh \
   -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$REFRESH_TOKEN\"}"
 ```
+
+Cliente mobile: mesmo fluxo, mas sem cookie — o refresh token vai e volta
+pelo corpo (`/auth/mobile/login`, `/auth/mobile/refresh`,
+`/auth/mobile/logout`), para ser guardado em armazenamento seguro do
+dispositivo (Keychain/Keystore) em vez de um cookie que não existe fora de
+um navegador. `/auth/register` é o mesmo para os dois clientes.
 
 ### Formato de erro
 

@@ -35,6 +35,24 @@ export const loginSchema = z.object({
   }),
 });
 
+/** Cliente mobile: o refresh token vem do corpo, nunca de cookie. */
+export const mobileRefreshSchema = z.object({
+  body: z.object({
+    refreshToken: z.string().min(1, 'Informe o refresh token.'),
+  }),
+});
+
+/**
+ * Sem o token, não há o que revogar — mas isso não é erro de validação: o
+ * logout continua idempotente também para quem não manda nada (ver
+ * `POST /auth/mobile/logout`).
+ */
+export const mobileLogoutSchema = z.object({
+  body: z.object({
+    refreshToken: z.string().min(1).optional(),
+  }),
+});
+
 export const updateUserSchema = z.object({
   params: z.object({ id: z.uuid('Id de usuário inválido.') }),
   body: z
@@ -66,3 +84,5 @@ export type CreateUserInput = z.infer<typeof createUserSchema>['body'];
 export type LoginInput = z.infer<typeof loginSchema>['body'];
 export type UpdateUserInput = z.infer<typeof updateUserSchema>['body'];
 export type DeleteUserInput = z.infer<typeof deleteUserSchema>['body'];
+export type MobileRefreshInput = z.infer<typeof mobileRefreshSchema>['body'];
+export type MobileLogoutInput = z.infer<typeof mobileLogoutSchema>['body'];
