@@ -11,6 +11,7 @@ export interface Env {
   readonly jwtRefreshSecret: string;
   readonly jwtAccessExpiresIn: string;
   readonly jwtRefreshExpiresIn: string;
+  readonly googleClientId: string;
 }
 
 function parseNodeEnv(value: string | undefined): NodeEnv {
@@ -46,6 +47,7 @@ function required(name: string): string {
 
 const jwtAccessSecret = required('JWT_ACCESS_SECRET');
 const jwtRefreshSecret = required('JWT_REFRESH_SECRET');
+const googleClientId = required('GOOGLE_CLIENT_ID');
 
 if (jwtAccessSecret === jwtRefreshSecret) {
   throw new Error('JWT_ACCESS_SECRET e JWT_REFRESH_SECRET devem ser diferentes.');
@@ -71,6 +73,7 @@ export const env: Env = {
   jwtRefreshSecret,
   jwtAccessExpiresIn: process.env['JWT_ACCESS_EXPIRES_IN'] ?? '15m',
   jwtRefreshExpiresIn: process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d',
+  googleClientId,
 };
 
 export default env;

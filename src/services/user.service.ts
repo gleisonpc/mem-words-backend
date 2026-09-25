@@ -2,7 +2,7 @@ import type { User } from '../generated/prisma/client.js';
 import prisma from '../lib/prisma.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { nextStreak } from '../lib/streak.js';
-import { ConflictError, NotFoundError, UnauthorizedError } from '../errors/AppError.js';
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from '../errors/AppError.js';
 import type { CreateUserInput, UpdateUserInput } from '../schemas/user.schema.js';
 
 /** Usuário como exposto pela API — nunca inclui o hash da senha. */
@@ -82,15 +82,16 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<Pu
     throw new NotFoundError('Usuário não encontrado.');
   }
 
-  // Trocar a senha exige confirmar a atual: impede que um access token
-  // roubado seja usado para assumir a conta em definitivo.
-  if (input.password !== undefined) {
-    const currentPasswordMatches = await verifyPassword(
-      input.currentPassword ?? '',
-      user.passwordHash,
-    );
+  // Trocar a senha de quem já tem uma exige confirmar a atual: impede que
+  // um access token roubado seja usado para assumir a conta em definitivo.
+  // Quem ainda não tem senha (conta criada via Google) não tem o que
+  // confirmar — o próprio access token válido já autentica a pessoa.
+  if (input.password !== undefined && user.passwordHash !== null) {
+    if (input.currentPassword === undefined) {
+      throw new BadRequestError('Informe a senha atual para alterar a senha.');
+    }
 
-    if (!currentPasswordMatches) {
+    if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
       throw new UnauthorizedError('Senha atual incorreta.');
     }
   }
@@ -125,7 +126,7 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<Pu
   return toPublicUser(updated);
 }
 
-export async function deleteUser(id: string, currentPassword: string): Promise<void> {
+export async function deleteUser(id: string, currentPassword: string | undefined): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id } });
 
   if (user === null) {
@@ -133,9 +134,16 @@ export async function deleteUser(id: string, currentPassword: string): Promise<v
   }
 
   // Mesmo motivo da troca de senha: um token de acesso obtido indevidamente
-  // não pode bastar para uma ação irreversível na conta.
-  if (!(await verifyPassword(currentPassword, user.passwordHash))) {
-    throw new UnauthorizedError('Senha atual incorreta.');
+  // não pode bastar para uma ação irreversível na conta. Quem não tem senha
+  // (conta criada via Google) não tem o que confirmar.
+  if (user.passwordHash !== null) {
+    if (currentPassword === undefined) {
+      throw new BadRequestError('Informe a senha atual para excluir a conta.');
+    }
+
+    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+      throw new UnauthorizedError('Senha atual incorreta.');
+    }
   }
 
   // Os baralhos, cards e refresh tokens caem junto por onDelete: Cascade.

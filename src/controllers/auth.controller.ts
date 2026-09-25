@@ -37,6 +37,23 @@ export const login: RequestHandler = async (req, res, next) => {
 };
 
 /**
+ * POST /auth/google
+ *
+ * Mesmo formato de resposta e mesmo cookie de renovação de `login` — só a
+ * verificação de credenciais muda (ID token do Google em vez de senha).
+ */
+export const googleLogin: RequestHandler = async (req, res, next) => {
+  try {
+    const { refreshToken, ...body } = await authService.loginWithGoogle(req.body.idToken);
+
+    setRefreshTokenCookie(res, refreshToken);
+    res.status(200).json(body);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * POST /auth/refresh
  *
  * O token apresentado vem do cookie, nunca do corpo — e o novo token de
