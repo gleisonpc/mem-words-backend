@@ -35,6 +35,12 @@ export const loginSchema = z.object({
   }),
 });
 
+export const googleLoginSchema = z.object({
+  body: z.object({
+    idToken: z.string().min(1, 'Informe o token do Google.'),
+  }),
+});
+
 /** Cliente mobile: o refresh token vem do corpo, nunca de cookie. */
 export const mobileRefreshSchema = z.object({
   body: z.object({
@@ -60,28 +66,30 @@ export const updateUserSchema = z.object({
       name: name.optional(),
       email: email.optional(),
       password: password.optional(),
-      /** Exigida para confirmar a troca de senha. */
+      // Exigida para confirmar a troca de senha, mas só quando a conta já
+      // tem senha definida — uma conta criada via Google pode não ter
+      // nenhuma para confirmar. Essa obrigatoriedade condicional depende de
+      // `passwordHash`, que o schema não enxerga, então é decidida pelo
+      // service (`user.service.updateUser`), não aqui.
       currentPassword: z.string().min(1).optional(),
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: 'Informe ao menos um campo para atualizar.',
-    })
-    .refine((data) => data.password === undefined || data.currentPassword !== undefined, {
-      message: 'Informe currentPassword para alterar a senha.',
-      path: ['currentPassword'],
     }),
 });
 
 export const deleteUserSchema = z.object({
   params: z.object({ id: z.uuid('Id de usuário inválido.') }),
   body: z.object({
-    /** Exigida para confirmar a exclusão — mesmo motivo da troca de senha. */
-    currentPassword: z.string().min(1, 'Informe a senha atual.'),
+    // Opcional pelo mesmo motivo de `updateUserSchema.currentPassword`: a
+    // obrigatoriedade depende de a conta ter senha, decidida pelo service.
+    currentPassword: z.string().min(1).optional(),
   }),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];
 export type LoginInput = z.infer<typeof loginSchema>['body'];
+export type GoogleLoginInput = z.infer<typeof googleLoginSchema>['body'];
 export type UpdateUserInput = z.infer<typeof updateUserSchema>['body'];
 export type DeleteUserInput = z.infer<typeof deleteUserSchema>['body'];
 export type MobileRefreshInput = z.infer<typeof mobileRefreshSchema>['body'];

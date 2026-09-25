@@ -16,8 +16,12 @@ model User {
   // Guardado sempre em minúsculas para que o índice único seja
   // case-insensitive na prática.
   email        String   @unique @db.VarChar(255)
-  // Hash bcrypt — a senha em texto puro nunca é persistida.
-  passwordHash String   @map("password_hash")
+  // Hash bcrypt — a senha em texto puro nunca é persistida. Opcional: uma
+  // conta criada via login com Google pode não ter senha nenhuma.
+  passwordHash String?  @map("password_hash")
+  // Identificador da conta Google (`sub` do ID token) vinculado a esta
+  // conta, quando existe — ver change `add-google-sign-in`.
+  googleId     String?  @unique @map("google_id")
   // Sequência de dias seguidos com ao menos uma nota de revisão
   // registrada, e o dia (calendário UTC) da última — ver
   // `src/lib/streak.ts` e o change `add-home-dashboard-summary`.
